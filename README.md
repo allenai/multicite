@@ -6,7 +6,7 @@ Modeling realistic citations requires moving beyond the single-sentence single-l
 
 The full dataset can be found at `data/full-v20210504.json`.  It has the following schema:
 
-```json
+```
 {
   <paper_id>: {
     "x": [                  # contains full paper text split by sentences
