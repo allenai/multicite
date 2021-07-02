@@ -2,6 +2,8 @@
 
 Modeling realistic citations requires moving beyond the single-sentence single-label setting.
 
+See our preprint on [arXiv](https://arxiv.org/abs/2107.00414).
+
 ## Dataset
 
 The full dataset can be found at `data/full-v20210504.json`.  It has the following schema:
@@ -50,5 +52,12 @@ MultiCite is released under the CC BY-NC 2.0 as it is derived on top of [S2ORC](
 If using this dataset, please cite:
 
 ```
-TBD
+@misc{multicite-lauscher-2021,
+    title={{M}ulti{C}ite: {M}odeling realistic citations requires moving beyond the single-sentence single-label setting},
+    author={Anne Lauscher and Brandon Ko and Bailey Kuhl and Sophie Johnson and David Jurgens and Arman Cohan and Kyle Lo},
+    year={2021},
+    eprint={2107.00414},
+    archivePrefix={arXiv},
+    primaryClass={cs.CL}
+}
 ```
