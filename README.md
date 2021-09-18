@@ -6,7 +6,7 @@ See our preprint on [arXiv](https://arxiv.org/abs/2107.00414).
 
 ## Dataset
 
-The full dataset can be found at `data/full-v20210504.json`.  It has the following schema:
+The full dataset can be found at `data/full-v20210918.json`.  It has the following schema:
 
 ```
 {
@@ -36,6 +36,21 @@ The full dataset can be found at `data/full-v20210504.json`.  It has the followi
   <paper_id>: {},
   <paper_id>: {},
   ...
+}
+```
+
+## Intent IDs
+
+```
+{
+    '@BACK@': 'Background',
+    '@MOT@': 'Motivation',
+    '@FUT@': 'Future Work',
+    '@SIM@': 'Similar',
+    '@DIF@': 'Difference',
+    '@USE@': 'Uses',
+    '@EXT@': 'Extention',
+    '@UNSURE@': 'Unsure'
 }
 ```
 
