@@ -54,7 +54,7 @@ If using this dataset, please cite:
 ```
 @misc{multicite-lauscher-2021,
     title={{M}ulti{C}ite: {M}odeling realistic citations requires moving beyond the single-sentence single-label setting},
-    author={Anne Lauscher and Brandon Ko and Bailey Kuhl and Sophie Johnson and David Jurgens and Arman Cohan and Kyle Lo},
+    author={Anne Lauscher and Brandon Ko and Bailey Kuehl and Sophie Johnson and David Jurgens and Arman Cohan and Kyle Lo},
     year={2021},
     eprint={2107.00414},
     archivePrefix={arXiv},
