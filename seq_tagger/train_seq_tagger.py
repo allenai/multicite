@@ -44,7 +44,8 @@ class MyDataset(Dataset):
     def __getitem__(self, idx):
         current_item = self.data[idx]
         cls_token = self.tokenizer.cls_token
-        text = cls_token.join(current_item["sentences"])
+        # weird hack. because [CLS] appears in data sometimes (see instance 1491), messes up label alignment.
+        text = cls_token.join([s.replace('[CLS]', 'CLS') for s in current_item["sentences"]])
         labels = current_item["labels"]
         token_ids = self.tokenizer.encode(text)
         intent_id = dm.tokenizer._convert_token_to_id_with_added_voc(current_item['intent'])
@@ -158,13 +159,23 @@ class MyTransformer(LightningModule):
         self.test_pred_output_path = test_pred_output_path
 
     def forward(self, **inputs):
+
+        i = 4
+        inputs["input_ids"][i][inputs["input_ids"][i] == self.tokenizer.cls_token_id].shape
+        inputs["labels"][i][inputs["labels"][i] != PAD_TOKEN_ID].shape
+
+
+
         output = self.model(inputs["input_ids"])
         cls_output_state = output["last_hidden_state"][inputs["input_ids"] == self.tokenizer.cls_token_id]
         logits = self.classifier(cls_output_state)
         labels = inputs["labels"][inputs["labels"] != PAD_TOKEN_ID] if "labels" in inputs else None
         instance_ids = inputs["instance_ids"][inputs["labels"] != PAD_TOKEN_ID] if "labels" in inputs else None
-        loss = self.loss_fn(logits, labels) if "labels" in inputs else None
-        return loss, logits, labels, instance_ids
+        try:
+            loss = self.loss_fn(logits, labels) if "labels" in inputs else None
+            return loss, logits, labels, instance_ids
+        except ValueError as e:
+            import pdb; pdb.set_trace()
 
     def training_step(self, batch, batch_idx):
         outputs = self(**batch)
