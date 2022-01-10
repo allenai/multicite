@@ -213,8 +213,10 @@ class MyTransformer(LightningModule):
         id_to_preds = defaultdict(list)
         for id, pred, label in zip(ids.tolist(), preds.cpu().tolist(), labels.cpu().tolist()):
             id_to_preds[id].append({'pred': pred, 'label': label})
-        with open(self.val_pred_output_path, 'w') as f_out:
-            json.dump(dict(id_to_preds), f_out, indent=4)
+        with open(os.path.join(self.val_pred_output_path, f'{self.current_epoch}.jsonl'), 'w') as f_out:
+            for id, preds in sorted(id_to_preds.items()):
+                json.dump({'id': id, 'preds': preds}, f_out)
+                f_out.write('\n')
 
         return loss
 
@@ -232,8 +234,10 @@ class MyTransformer(LightningModule):
         id_to_preds = defaultdict(list)
         for id, pred, label in zip(ids.tolist(), preds.tolist(), labels.tolist()):
             id_to_preds[id].append({'pred': pred, 'label': label})
-        with open(self.test_pred_output_path, 'w') as f_out:
-            json.dump(dict(id_to_preds), f_out, indent=4)
+        with open(os.path.join(self.test_pred_output_path, f'{self.current_epoch}.json'), 'w') as f_out:
+            for id, preds in sorted(id_to_preds.items()):
+                json.dump({'id': id, 'preds': preds}, f_out)
+                f_out.write('\n')
 
         return loss
 
@@ -282,7 +286,7 @@ if __name__ == '__main__':
     parser.add_argument('--warmup_steps', type=int, default=100)
     parser.add_argument('--max_epochs', type=int, default=1)
     parser.add_argument('--gpus', type=int, default=0)
-    parser.add_argument('--max_steps', type=int)
+    parser.add_argument('--max_steps', type=int)        # set this for debugging
     args = parser.parse_args()
 
     dm = MyDataModule(model_name_or_path=args.model_name_or_path, max_seq_length=512, batch_size=args.batch_size, cache_dir=args.input)
@@ -301,8 +305,8 @@ if __name__ == '__main__':
 
     os.makedirs(args.output, exist_ok=True)
     model = MyTransformer(warmup_steps=args.warmup_steps, tokenizer=dm.tokenizer,
-                          val_pred_output_path=os.path.join(args.output, 'val_pred.json'),
-                          test_pred_output_path=os.path.join(args.output, 'test_pred.json'))
+                          val_pred_output_path=os.path.join(args.output, 'val_pred/'),
+                          test_pred_output_path=os.path.join(args.output, 'test_pred/'))
     trainer = Trainer(gpus=args.gpus, progress_bar_refresh_rate=5, max_epochs=args.max_epochs, max_steps=args.max_steps)
     trainer.fit(model, dm)
     trainer.save_checkpoint(os.path.join(args.output, 'model.ckpt'))
