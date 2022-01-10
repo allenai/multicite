@@ -3,15 +3,49 @@
 Sequence tagging
 
 
+# CUDA0
 python train_seq_tagger.py \
     --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__11__1__07-01-02/0/ \
     --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__11__1__07-01-02/0/ \
     --model_name_or_path allenai/scibert_scivocab_uncased \
-    --batch_size 16 \
-    --warmup_steps 200 \
+    --batch_size 32 \
+    --warmup_steps 100 \
     --max_epochs 5 \
     --gpus 1
-    --max_steps 5
+
+
+# CUDA1
+python train_seq_tagger.py \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__11__1__07-01-02/1/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__11__1__07-01-02/1/ \
+    --model_name_or_path allenai/scibert_scivocab_uncased \
+    --batch_size 32 \
+    --warmup_steps 100 \
+    --max_epochs 5 \
+    --gpus 1
+
+
+# CUDA2
+python train_seq_tagger.py \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__11__1__07-01-02/2/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__11__1__07-01-02/2/ \
+    --model_name_or_path allenai/scibert_scivocab_uncased \
+    --batch_size 32 \
+    --warmup_steps 100 \
+    --max_epochs 5 \
+    --gpus 1
+
+
+# CUDA3
+python train_seq_tagger.py \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__11__1__07-01-02/3/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__11__1__07-01-02/3/ \
+    --model_name_or_path allenai/scibert_scivocab_uncased \
+    --batch_size 32 \
+    --warmup_steps 100 \
+    --max_epochs 5 \
+    --gpus 1
+
 
 """
 
@@ -88,6 +122,7 @@ class MyDataModule(LightningDataModule):
         max_seq_length: int = 512,
         batch_size: int = 8,
         cache_dir: str = "data/allenai-scibert_scivocab_uncased__11__1__07-01-02/0/",
+        debug: bool = False,
         **kwargs,
     ):
         super().__init__()
@@ -171,11 +206,8 @@ class MyTransformer(LightningModule):
         logits = self.classifier(cls_output_state)
         labels = inputs["labels"][inputs["labels"] != PAD_TOKEN_ID] if "labels" in inputs else None
         instance_ids = inputs["instance_ids"][inputs["labels"] != PAD_TOKEN_ID] if "labels" in inputs else None
-        try:
-            loss = self.loss_fn(logits, labels) if "labels" in inputs else None
-            return loss, logits, labels, instance_ids
-        except ValueError as e:
-            import pdb; pdb.set_trace()
+        loss = self.loss_fn(logits, labels) if "labels" in inputs else None
+        return loss, logits, labels, instance_ids
 
     def training_step(self, batch, batch_idx):
         outputs = self(**batch)
@@ -190,6 +222,7 @@ class MyTransformer(LightningModule):
             preds = torch.argmax(logits, axis=1)
         elif self.hparams.num_labels == 1:
             preds = logits.squeeze()
+        # import pdb; pdb.set_trace()
         return {"loss": val_loss, "preds": preds, "labels": labels, 'instance_ids': instance_ids}
 
     def test_step(self, batch, batch_idx):
@@ -206,10 +239,14 @@ class MyTransformer(LightningModule):
         labels = torch.cat([x["labels"] for x in outputs]).detach()
         loss = torch.stack([x["loss"] for x in outputs]).mean()
         self.log("val_loss", loss)
-        val_acc = self.metric_acc(preds, labels)
-        val_f1 = self.metric_f1(preds, labels)
-        self.log("val_acc", val_acc.cpu(), prog_bar=True)
-        self.log("val_f1", val_f1.cpu(), prog_bar=True)
+        val_acc = self.metric_acc(preds, labels).cpu()
+        val_f1 = self.metric_f1(preds, labels).cpu()
+        self.log("val_acc", val_acc, prog_bar=True)
+        self.log("val_f1", val_f1, prog_bar=True)
+
+        print(f'Logging validation scores for epoch {self.current_epoch}')
+        with open(os.path.join(self.val_pred_output_path, f'val-metrics{self.current_epoch}.json'), 'w') as f_out:
+            json.dump({'val_loss': loss, 'val_acc': val_acc, 'val_f1': val_f1}, f_out, indent=4)
 
         print(f'Logging validation predictions for epoch {self.current_epoch}')
         ids = torch.cat([x["instance_ids"] for x in outputs]).detach().cpu()
@@ -232,6 +269,10 @@ class MyTransformer(LightningModule):
         test_f1 = self.metric_f1(preds, labels)
         self.log("test_acc", test_acc.cpu(), prog_bar=True)
         self.log("test_f1", test_f1.cpu(), prog_bar=True)
+
+        print(f'Logging test scores for epoch {self.current_epoch}')
+        with open(os.path.join(self.val_pred_output_path, f'test-metrics{self.current_epoch}.json'), 'w') as f_out:
+            json.dump({'test_loss': loss, 'test_acc': test_acc, 'test_f1': test_f1}, f_out, indent=4)
 
         print(f'Logging test predictions for epoch {self.current_epoch}')
         ids = torch.cat([x["instance_ids"] for x in outputs]).detach().cpu()
@@ -290,13 +331,14 @@ if __name__ == '__main__':
     parser.add_argument('--warmup_steps', type=int, default=100)
     parser.add_argument('--max_epochs', type=int, default=1)
     parser.add_argument('--gpus', type=int, default=0)
-    parser.add_argument('--max_steps', type=int)        # set this for debugging
+    parser.add_argument('--debug', action='store_true')     # this shrinks data sizes to run through everything
     args = parser.parse_args()
 
     dm = MyDataModule(model_name_or_path=args.model_name_or_path,
                       max_seq_length=512,
                       batch_size=args.batch_size,
-                      cache_dir=args.input)
+                      cache_dir=args.input,
+                      debug=args.debug)
     dm.setup()
 
     # double-check data
@@ -313,7 +355,7 @@ if __name__ == '__main__':
     # callbacks
     checkpoint_callback = ModelCheckpoint(dirpath=args.output,
                                           monitor='val_loss',
-                                          filename='{epoch:02d}-{step:02d}-{val_loss:.2f}',
+                                          filename='{epoch:02d}-{step:02d}-{val_loss:.4f}-{val_f1:.4f}',
                                           save_top_k=args.max_epochs)
 
     # setup & train
@@ -325,7 +367,6 @@ if __name__ == '__main__':
     trainer = Trainer(gpus=args.gpus,
                       progress_bar_refresh_rate=5,
                       max_epochs=args.max_epochs,
-                      max_steps=args.max_steps,
                       callbacks=[checkpoint_callback])
     trainer.fit(model, dm)
 
