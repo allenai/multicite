@@ -160,11 +160,9 @@ class MyTransformer(LightningModule):
 
     def forward(self, **inputs):
 
-        i = 4
-        inputs["input_ids"][i][inputs["input_ids"][i] == self.tokenizer.cls_token_id].shape
-        inputs["labels"][i][inputs["labels"][i] != PAD_TOKEN_ID].shape
-
-
+        # i = 4
+        # inputs["input_ids"][i][inputs["input_ids"][i] == self.tokenizer.cls_token_id].shape
+        # inputs["labels"][i][inputs["labels"][i] != PAD_TOKEN_ID].shape
 
         output = self.model(inputs["input_ids"])
         cls_output_state = output["last_hidden_state"][inputs["input_ids"] == self.tokenizer.cls_token_id]
