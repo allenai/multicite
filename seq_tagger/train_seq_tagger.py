@@ -293,7 +293,10 @@ if __name__ == '__main__':
     parser.add_argument('--max_steps', type=int)        # set this for debugging
     args = parser.parse_args()
 
-    dm = MyDataModule(model_name_or_path=args.model_name_or_path, max_seq_length=512, batch_size=args.batch_size, cache_dir=args.input)
+    dm = MyDataModule(model_name_or_path=args.model_name_or_path,
+                      max_seq_length=512,
+                      batch_size=args.batch_size,
+                      cache_dir=args.input)
     dm.setup()
 
     # double-check data
@@ -310,7 +313,8 @@ if __name__ == '__main__':
     # callbacks
     checkpoint_callback = ModelCheckpoint(dirpath=args.output,
                                           monitor='val_loss',
-                                          filename='epoch{epoch:02d}-{val_loss:.2f}')
+                                          filename='{epoch:02d}-{step:02d}-{val_loss:.2f}',
+                                          save_top_k=args.max_epochs)
 
     # setup & train
     os.makedirs(args.output, exist_ok=True)
