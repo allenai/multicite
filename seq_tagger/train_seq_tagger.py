@@ -3,7 +3,14 @@
 Sequence tagging
 
 
-python seq_tagger/train_seq_tagger.py --input data/allenai-scibert_scivocab_uncased__11__1__07-01-02/0/ --output output/allenai-scibert_scivocab_uncased__11__1__07-01-02/0/
+python train_seq_tagger.py \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__11__1__07-01-02/0/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__11__1__07-01-02/0/ \
+    --model_name_or_path allenai/scibert_scivocab_uncased \
+    --batch_size 8 \
+    --warmup_steps 100 \
+    --max_epochs 1 \
+    --gpus 1
 
 """
 
@@ -19,7 +26,6 @@ import torchmetrics
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
 from torch.nn.modules.loss import CrossEntropyLoss
 from torch.utils.data import DataLoader, Dataset
-from torchvision.datasets.utils import download_url
 from transformers import AdamW, AutoConfig, AutoModel, AutoTokenizer, get_linear_schedule_with_warmup
 
 from seq_tagger.const import SPECIAL_TOKENS, PAD_TOKEN_ID
@@ -187,18 +193,18 @@ class MyTransformer(LightningModule):
         return {"loss": test_loss, "preds": preds, "labels": labels, 'instance_ids': instance_ids}
 
     def validation_epoch_end(self, outputs):
-        ids = torch.cat([x["instance_ids"] for x in outputs]).detach().cpu()
-        preds = torch.cat([x["preds"] for x in outputs]).detach().cpu()
-        labels = torch.cat([x["labels"] for x in outputs]).detach().cpu()
+        preds = torch.cat([x["preds"] for x in outputs]).detach()
+        labels = torch.cat([x["labels"] for x in outputs]).detach()
         loss = torch.stack([x["loss"] for x in outputs]).mean()
         self.log("val_loss", loss)
         val_acc = self.metric_acc(preds, labels)
         val_f1 = self.metric_f1(preds, labels)
-        self.log("val_acc", val_acc, prog_bar=True)
-        self.log("val_f1", val_f1, prog_bar=True)
+        self.log("val_acc", val_acc.cpu(), prog_bar=True)
+        self.log("val_f1", val_f1.cpu(), prog_bar=True)
 
+        ids = torch.cat([x["instance_ids"] for x in outputs]).detach().cpu()
         id_to_preds = defaultdict(list)
-        for id, pred, label in zip(ids.tolist(), preds.tolist(), labels.tolist()):
+        for id, pred, label in zip(ids.tolist(), preds.cpu().tolist(), labels.cpu().tolist()):
             id_to_preds[id].append({'pred': pred, 'label': label})
         with open(self.val_pred_output_path, 'w') as f_out:
             json.dump(dict(id_to_preds), f_out, indent=4)
@@ -266,8 +272,8 @@ if __name__ == '__main__':
     parser.add_argument('-o', '--output', type=str, help='Directory path to output files.', required=True)
     parser.add_argument('--model_name_or_path', type=str, default='allenai/scibert_scivocab_uncased')
     parser.add_argument('--batch_size', type=int, default=8)
-    parser.add_argument('--warmup_steps', type=int, default=200)
-    parser.add_argument('--max_epochs', type=int, default=1)
+    parser.add_argument('--warmup_steps', type=int, default=100)
+    parser.add_argument('--max_epochs', type=int, default=)
     parser.add_argument('--gpus', type=int, default=0)
     parser.add_argument('--max_steps', type=int)
     args = parser.parse_args()
