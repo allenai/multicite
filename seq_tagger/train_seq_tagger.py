@@ -5,8 +5,8 @@ Sequence tagging
 
 # CUDA0
 python train_seq_tagger.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__11__1__07-01-02/0/ \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__11__1__07-01-02/0/ \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__5__1__07-01-02/0/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02/0/ \
     --model_name_or_path allenai/scibert_scivocab_uncased \
     --batch_size 32 \
     --warmup_steps 100 \
@@ -16,8 +16,8 @@ python train_seq_tagger.py \
 
 # CUDA1
 python train_seq_tagger.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__11__1__07-01-02/1/ \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__11__1__07-01-02/1/ \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__5__1__07-01-02/1/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02/1/ \
     --model_name_or_path allenai/scibert_scivocab_uncased \
     --batch_size 32 \
     --warmup_steps 100 \
@@ -27,8 +27,8 @@ python train_seq_tagger.py \
 
 # CUDA2
 python train_seq_tagger.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__11__1__07-01-02/2/ \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__11__1__07-01-02/2/ \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__5__1__07-01-02/2/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02/2/ \
     --model_name_or_path allenai/scibert_scivocab_uncased \
     --batch_size 32 \
     --warmup_steps 100 \
@@ -38,8 +38,8 @@ python train_seq_tagger.py \
 
 # CUDA3
 python train_seq_tagger.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__11__1__07-01-02/3/ \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__11__1__07-01-02/3/ \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__5__1__07-01-02/3/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02/3/ \
     --model_name_or_path allenai/scibert_scivocab_uncased \
     --batch_size 32 \
     --warmup_steps 100 \
@@ -246,7 +246,7 @@ class MyTransformer(LightningModule):
 
         print(f'Logging validation scores for epoch {self.current_epoch}')
         with open(os.path.join(self.val_pred_output_path, f'val-metrics{self.current_epoch}.json'), 'w') as f_out:
-            json.dump({'val_loss': loss, 'val_acc': val_acc, 'val_f1': val_f1}, f_out, indent=4)
+            json.dump({'val_loss': loss.cpu().tolist(), 'val_acc': val_acc.tolist(), 'val_f1': val_f1.tolist()}, f_out, indent=4)
 
         print(f'Logging validation predictions for epoch {self.current_epoch}')
         ids = torch.cat([x["instance_ids"] for x in outputs]).detach().cpu()
@@ -272,7 +272,7 @@ class MyTransformer(LightningModule):
 
         print(f'Logging test scores for epoch {self.current_epoch}')
         with open(os.path.join(self.val_pred_output_path, f'test-metrics{self.current_epoch}.json'), 'w') as f_out:
-            json.dump({'test_loss': loss, 'test_acc': test_acc, 'test_f1': test_f1}, f_out, indent=4)
+            json.dump({'test_loss': loss.cpu().tolist(), 'test_acc': test_acc.tolist(), 'test_f1': test_f1.tolist()}, f_out, indent=4)
 
         print(f'Logging test predictions for epoch {self.current_epoch}')
         ids = torch.cat([x["instance_ids"] for x in outputs]).detach().cpu()
