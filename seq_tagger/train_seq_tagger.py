@@ -222,19 +222,19 @@ class MyTransformer(LightningModule):
         return loss
 
     def test_epoch_end(self, outputs):
-        ids = torch.cat([x["instance_ids"] for x in outputs]).detach().cpu()
-        preds = torch.cat([x["preds"] for x in outputs]).detach().cpu()
-        labels = torch.cat([x["labels"] for x in outputs]).detach().cpu()
+        preds = torch.cat([x["preds"] for x in outputs]).detach()
+        labels = torch.cat([x["labels"] for x in outputs]).detach()
         loss = torch.stack([x["loss"] for x in outputs]).mean()
         self.log("test_loss", loss)
         test_acc = self.metric_acc(preds, labels)
         test_f1 = self.metric_f1(preds, labels)
-        self.log("test_acc", test_acc, prog_bar=True)
-        self.log("test_f1", test_f1, prog_bar=True)
+        self.log("test_acc", test_acc.cpu(), prog_bar=True)
+        self.log("test_f1", test_f1.cpu(), prog_bar=True)
 
         print(f'Logging test predictions for epoch {self.current_epoch}')
+        ids = torch.cat([x["instance_ids"] for x in outputs]).detach().cpu()
         id_to_preds = defaultdict(list)
-        for id, pred, label in zip(ids.tolist(), preds.tolist(), labels.tolist()):
+        for id, pred, label in zip(ids.tolist(), preds.cpu().tolist(), labels.cpu().tolist()):
             id_to_preds[id].append({'pred': pred, 'label': label})
         with open(os.path.join(self.test_pred_output_path, f'test-{self.current_epoch}.json'), 'w') as f_out:
             for id, preds in sorted(id_to_preds.items()):
