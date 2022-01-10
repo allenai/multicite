@@ -209,11 +209,12 @@ class MyTransformer(LightningModule):
         self.log("val_acc", val_acc.cpu(), prog_bar=True)
         self.log("val_f1", val_f1.cpu(), prog_bar=True)
 
+        print(f'Logging validation predictions for epoch {self.current_epoch}')
         ids = torch.cat([x["instance_ids"] for x in outputs]).detach().cpu()
         id_to_preds = defaultdict(list)
         for id, pred, label in zip(ids.tolist(), preds.cpu().tolist(), labels.cpu().tolist()):
             id_to_preds[id].append({'pred': pred, 'label': label})
-        with open(os.path.join(self.val_pred_output_path, f'{self.current_epoch}.jsonl'), 'w') as f_out:
+        with open(os.path.join(self.val_pred_output_path, f'val-{self.current_epoch}.jsonl'), 'w') as f_out:
             for id, preds in sorted(id_to_preds.items()):
                 json.dump({'id': id, 'preds': preds}, f_out)
                 f_out.write('\n')
@@ -231,10 +232,11 @@ class MyTransformer(LightningModule):
         self.log("test_acc", test_acc, prog_bar=True)
         self.log("test_f1", test_f1, prog_bar=True)
 
+        print(f'Logging test predictions for epoch {self.current_epoch}')
         id_to_preds = defaultdict(list)
         for id, pred, label in zip(ids.tolist(), preds.tolist(), labels.tolist()):
             id_to_preds[id].append({'pred': pred, 'label': label})
-        with open(os.path.join(self.test_pred_output_path, f'{self.current_epoch}.json'), 'w') as f_out:
+        with open(os.path.join(self.test_pred_output_path, f'test-{self.current_epoch}.json'), 'w') as f_out:
             for id, preds in sorted(id_to_preds.items()):
                 json.dump({'id': id, 'preds': preds}, f_out)
                 f_out.write('\n')
@@ -305,8 +307,8 @@ if __name__ == '__main__':
 
     os.makedirs(args.output, exist_ok=True)
     model = MyTransformer(warmup_steps=args.warmup_steps, tokenizer=dm.tokenizer,
-                          val_pred_output_path=os.path.join(args.output, 'val_pred/'),
-                          test_pred_output_path=os.path.join(args.output, 'test_pred/'))
+                          val_pred_output_path=args.output,
+                          test_pred_output_path=args.output)
     trainer = Trainer(gpus=args.gpus, progress_bar_refresh_rate=5, max_epochs=args.max_epochs, max_steps=args.max_steps)
     trainer.fit(model, dm)
     trainer.save_checkpoint(os.path.join(args.output, 'model.ckpt'))
