@@ -169,9 +169,7 @@ class MyTransformer(LightningModule):
     def training_step(self, batch, batch_idx):
         outputs = self(**batch)
         loss = outputs[0]
-        acc = outputs[1]
         self.log("loss", loss)
-        self.log("accuracy", acc)
         return loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
