@@ -7,10 +7,11 @@ python train_seq_tagger.py \
     --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__11__1__07-01-02/0/ \
     --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__11__1__07-01-02/0/ \
     --model_name_or_path allenai/scibert_scivocab_uncased \
-    --batch_size 8 \
-    --warmup_steps 100 \
-    --max_epochs 1 \
+    --batch_size 16 \
+    --warmup_steps 200 \
+    --max_epochs 5 \
     --gpus 1
+    --max_steps 5
 
 """
 
@@ -24,6 +25,7 @@ from collections import Counter, defaultdict
 import torch
 import torchmetrics
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
+from pytorch_lightning.callbacks import ModelCheckpoint
 from torch.nn.modules.loss import CrossEntropyLoss
 from torch.utils.data import DataLoader, Dataset
 from transformers import AdamW, AutoConfig, AutoModel, AutoTokenizer, get_linear_schedule_with_warmup
@@ -236,7 +238,7 @@ class MyTransformer(LightningModule):
         id_to_preds = defaultdict(list)
         for id, pred, label in zip(ids.tolist(), preds.cpu().tolist(), labels.cpu().tolist()):
             id_to_preds[id].append({'pred': pred, 'label': label})
-        with open(os.path.join(self.test_pred_output_path, f'test-{self.current_epoch}.json'), 'w') as f_out:
+        with open(os.path.join(self.test_pred_output_path, f'test-{self.current_epoch}.jsonl'), 'w') as f_out:
             for id, preds in sorted(id_to_preds.items()):
                 json.dump({'id': id, 'preds': preds}, f_out)
                 f_out.write('\n')
@@ -305,17 +307,28 @@ if __name__ == '__main__':
     labels = Counter([label for label in first_example['labels']])
     print(f'Labels ({dm.train_dataset.label_map}): {labels}')
 
+    # callbacks
+    checkpoint_callback = ModelCheckpoint(dirpath=args.output,
+                                          monitor='val_loss',
+                                          filename='epoch{epoch:02d}-{val_loss:.2f}')
+
+    # setup & train
     os.makedirs(args.output, exist_ok=True)
-    model = MyTransformer(warmup_steps=args.warmup_steps, tokenizer=dm.tokenizer,
+    model = MyTransformer(warmup_steps=args.warmup_steps,
+                          tokenizer=dm.tokenizer,
                           val_pred_output_path=args.output,
                           test_pred_output_path=args.output)
-    trainer = Trainer(gpus=args.gpus, progress_bar_refresh_rate=5, max_epochs=args.max_epochs, max_steps=args.max_steps)
+    trainer = Trainer(gpus=args.gpus,
+                      progress_bar_refresh_rate=5,
+                      max_epochs=args.max_epochs,
+                      max_steps=args.max_steps,
+                      callbacks=[checkpoint_callback])
     trainer.fit(model, dm)
-    trainer.save_checkpoint(os.path.join(args.output, 'model.ckpt'))
+
     # test this works
+    # trainer.save_checkpoint(os.path.join(args.output, 'model.ckpt'))
     # new_model = MyTransformer.load_from_checkpoint(checkpoint_path=os.path.join(args.output, 'model.ckpt'))
 
     val_results = trainer.validate(model, dm.val_dataloader())
     test_results = trainer.test(model, dm.test_dataloader())
-
 
