@@ -3,6 +3,12 @@
 After training, get processing-agnostic test metrics.
 
 
+python eval_pred.py \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__11__1__07-01-02/ \
+    --pred /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__11__1__07-01-02__batch32/ \
+    --full /net/nfs2.s2-research/kylel/multicite-2022/data/full-v20210918.json \
+    --result /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__11__1__07-01-02__batch32/ \
+
 
 """
 
@@ -121,12 +127,9 @@ if __name__ == '__main__':
             for intent, annotations in data['y'].items():
                 # original contexts stored in a structured way. just unfurl them into a single set of sent_ids for this eval
                 gold_sent_ids = sorted({sent_id for context in annotations['gold_contexts'] for sent_id in context}, key=lambda s: sent_id_to_pos(sent_id))
-                try:
-                    pred_sent_ids = paper_id_to_intent_to_pred_sents[paper_id][intent]
-                    metrics = compute_paper_scores(pred_sent_ids=pred_sent_ids, gold_sent_ids=gold_sent_ids, paper_len=paper_len)
-                    paper_id_to_scores[paper_id] = metrics
-                except Exception:
-                    continue
+                pred_sent_ids = paper_id_to_intent_to_pred_sents[paper_id][intent]
+                metrics = compute_paper_scores(pred_sent_ids=pred_sent_ids, gold_sent_ids=gold_sent_ids, paper_len=paper_len)
+                paper_id_to_scores[paper_id] = metrics
 
     # write scores
     with open(os.path.join(args.result, 'per_paper_metrics.csv'), 'w') as f_out:
