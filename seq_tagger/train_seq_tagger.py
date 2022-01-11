@@ -2,33 +2,10 @@
 
 Sequence tagging
 
-
 # CUDA0
 python train_seq_tagger.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__5__1__07-01-02/0/ \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02/0/ \
-    --model_name_or_path allenai/scibert_scivocab_uncased \
-    --batch_size 32 \
-    --warmup_steps 100 \
-    --max_epochs 5 \
-    --gpus 1
-
-
-# CUDA1
-python train_seq_tagger.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__5__1__07-01-02/1/ \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02/1/ \
-    --model_name_or_path allenai/scibert_scivocab_uncased \
-    --batch_size 32 \
-    --warmup_steps 100 \
-    --max_epochs 5 \
-    --gpus 1
-
-
-# CUDA2
-python train_seq_tagger.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__5__1__07-01-02/2/ \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02/2/ \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__9__1__07-01-02/0/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__9__1__07-01-02__batch32/0/ \
     --model_name_or_path allenai/scibert_scivocab_uncased \
     --batch_size 32 \
     --warmup_steps 100 \
@@ -38,13 +15,53 @@ python train_seq_tagger.py \
 
 # CUDA3
 python train_seq_tagger.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__5__1__07-01-02/3/ \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02/3/ \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__9__1__07-01-02/3/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__9__1__07-01-02__batch32/3/ \
     --model_name_or_path allenai/scibert_scivocab_uncased \
     --batch_size 32 \
     --warmup_steps 100 \
     --max_epochs 5 \
     --gpus 1
+
+
+
+
+
+# CUDA1 (slow one)
+python train_seq_tagger.py \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__7__1__07-01-02/3/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__7__1__07-01-02__batch32/3/ \
+    --model_name_or_path allenai/scibert_scivocab_uncased \
+    --batch_size 32 \
+    --warmup_steps 100 \
+    --max_epochs 5 \
+    --gpus 1
+
+
+# CUDA2
+python train_seq_tagger.py \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__5__1__07-01-02/1/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02__batch16/1/ \
+    --model_name_or_path allenai/scibert_scivocab_uncased \
+    --batch_size 16 \
+    --warmup_steps 100 \
+    --max_epochs 5 \
+    --gpus 1
+
+
+
+# Server5 CUDA2
+python train_seq_tagger.py \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__5__1__07-01-02/4/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02__batch16/4/ \
+    --model_name_or_path allenai/scibert_scivocab_uncased \
+    --batch_size 16 \
+    --warmup_steps 100 \
+    --max_epochs 5 \
+    --gpus 1
+
+
+
 
 
 """
@@ -122,7 +139,7 @@ class MyDataModule(LightningDataModule):
         max_seq_length: int = 512,
         batch_size: int = 8,
         cache_dir: str = "data/allenai-scibert_scivocab_uncased__11__1__07-01-02/0/",
-        debug: bool = False,
+        debug: int = None,
         **kwargs,
     ):
         super().__init__()
@@ -132,6 +149,7 @@ class MyDataModule(LightningDataModule):
         self.tokenizer = AutoTokenizer.from_pretrained(self.model_name_or_path, add_prefix_space=False, use_fast=True)
         self.tokenizer.add_special_tokens({'additional_special_tokens': SPECIAL_TOKENS})
         self.cache_dir = cache_dir
+        self.debug = debug
 
     def setup(self, stage = 'fit'):
         def load_data(path):
@@ -145,6 +163,10 @@ class MyDataModule(LightningDataModule):
             train_data = load_data(os.path.join(self.cache_dir, 'train.jsonl'))
             val_data = load_data(os.path.join(self.cache_dir , 'dev.jsonl'))
             test_data = load_data(os.path.join(self.cache_dir, 'test.jsonl'))
+            if self.debug:
+                train_data = train_data[:self.debug]
+                val_data = val_data[:self.debug]
+                test_data = test_data[:self.debug]
             self.train_dataset = MyDataset(train_data, self.tokenizer)
             self.val_dataset = MyDataset(val_data, self.tokenizer)
             self.test_dataset = MyDataset(test_data, self.tokenizer)
@@ -222,8 +244,7 @@ class MyTransformer(LightningModule):
             preds = torch.argmax(logits, axis=1)
         elif self.hparams.num_labels == 1:
             preds = logits.squeeze()
-        # import pdb; pdb.set_trace()
-        return {"loss": val_loss, "preds": preds, "labels": labels, 'instance_ids': instance_ids}
+        return {"loss": val_loss, "preds": preds, "labels": labels, 'instance_ids': instance_ids, 'logits': logits}
 
     def test_step(self, batch, batch_idx):
         outputs = self(**batch)
@@ -232,12 +253,13 @@ class MyTransformer(LightningModule):
             preds = torch.argmax(logits, axis=1)
         elif self.hparams.num_labels == 1:
             preds = logits.squeeze()
-        return {"loss": test_loss, "preds": preds, "labels": labels, 'instance_ids': instance_ids}
+        return {"loss": test_loss, "preds": preds, "labels": labels, 'instance_ids': instance_ids, 'logits': logits}
 
     def validation_epoch_end(self, outputs):
         preds = torch.cat([x["preds"] for x in outputs]).detach()
         labels = torch.cat([x["labels"] for x in outputs]).detach()
         loss = torch.stack([x["loss"] for x in outputs]).mean()
+        logits = torch.cat([x["logits"] for x in outputs]).detach()
         self.log("val_loss", loss)
         val_acc = self.metric_acc(preds, labels).cpu()
         val_f1 = self.metric_f1(preds, labels).cpu()
@@ -251,8 +273,8 @@ class MyTransformer(LightningModule):
         print(f'Logging validation predictions for epoch {self.current_epoch}')
         ids = torch.cat([x["instance_ids"] for x in outputs]).detach().cpu()
         id_to_preds = defaultdict(list)
-        for id, pred, label in zip(ids.tolist(), preds.cpu().tolist(), labels.cpu().tolist()):
-            id_to_preds[id].append({'pred': pred, 'label': label})
+        for id, pred, label, logit in zip(ids.tolist(), preds.cpu().tolist(), labels.cpu().tolist(), logits.cpu().tolist()):
+            id_to_preds[id].append({'pred': pred, 'label': label, 'logits': logit})
         with open(os.path.join(self.val_pred_output_path, f'val-{self.current_epoch}.jsonl'), 'w') as f_out:
             for id, preds in sorted(id_to_preds.items()):
                 json.dump({'id': id, 'preds': preds}, f_out)
@@ -264,6 +286,7 @@ class MyTransformer(LightningModule):
         preds = torch.cat([x["preds"] for x in outputs]).detach()
         labels = torch.cat([x["labels"] for x in outputs]).detach()
         loss = torch.stack([x["loss"] for x in outputs]).mean()
+        logits = torch.cat([x["logits"] for x in outputs]).detach()
         self.log("test_loss", loss)
         test_acc = self.metric_acc(preds, labels)
         test_f1 = self.metric_f1(preds, labels)
@@ -277,8 +300,8 @@ class MyTransformer(LightningModule):
         print(f'Logging test predictions for epoch {self.current_epoch}')
         ids = torch.cat([x["instance_ids"] for x in outputs]).detach().cpu()
         id_to_preds = defaultdict(list)
-        for id, pred, label in zip(ids.tolist(), preds.cpu().tolist(), labels.cpu().tolist()):
-            id_to_preds[id].append({'pred': pred, 'label': label})
+        for id, pred, label, logit in zip(ids.tolist(), preds.cpu().tolist(), labels.cpu().tolist(), logits.cpu().tolist()):
+            id_to_preds[id].append({'pred': pred, 'label': label, 'logits': logit})
         with open(os.path.join(self.test_pred_output_path, f'test-{self.current_epoch}.jsonl'), 'w') as f_out:
             for id, preds in sorted(id_to_preds.items()):
                 json.dump({'id': id, 'preds': preds}, f_out)
@@ -331,7 +354,7 @@ if __name__ == '__main__':
     parser.add_argument('--warmup_steps', type=int, default=100)
     parser.add_argument('--max_epochs', type=int, default=1)
     parser.add_argument('--gpus', type=int, default=0)
-    parser.add_argument('--debug', action='store_true')     # this shrinks data sizes to run through everything
+    parser.add_argument('--debug', type=int)     # this shrinks data sizes (default 8) to run through everything
     args = parser.parse_args()
 
     dm = MyDataModule(model_name_or_path=args.model_name_or_path,
