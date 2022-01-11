@@ -40,12 +40,15 @@ and Gold CONTEXT.  This script will only penalize models for if window is too sm
 
 To run this script, point it to the top-level directory containing all the CV Folds:
 
-python eval_seq_tagger_preds.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__5__1__07-01-02/ \
-    --pred_dirname /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02__batch32/ \
+window=3; python eval_seq_tagger_preds.py \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__${window}__1__07-01-02/ \
+    --pred_dirname /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/ \
     --pred_fname test-4 \
     --full /net/nfs2.s2-research/kylel/multicite-2022/data/full-v20210918.json \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/results/allenai-scibert_scivocab_uncased__5__1__07-01-02__batch32/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/results/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/ \
+
+
+
 
 
 This should result in new files being created:
@@ -68,6 +71,7 @@ from collections import defaultdict
 
 from glob import glob
 
+import numpy as np
 from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
 
 
@@ -218,3 +222,23 @@ if __name__ == '__main__':
                 f"{scores['support']['total']}"
             ]))
             f_out.write('\n')
+
+    with open(os.path.join(args.output, f'macro_metrics_for_{args.pred_fname}.json'), 'w') as f_out:
+        tp, tn, fp, fn, num_context, num_sents = 0, 0, 0, 0, 0, 0
+        f1 = []
+        for paper_id, scores in paper_id_to_metrics.items()
+            tp += scores['tp']
+            tn += scores['tn']
+            fp += scores['fp']
+            fn += scores['fn']
+            num_context += scores['support']['context']
+            num_sents += scores['support']['total']
+            f1.append(scores['f1'])
+        json.dump({
+            'macro-f1': np.mean(f1),
+            'sd-macro-f1': np.std(f1),
+            'micro-f1': tp / (tp + 0.5 * (fp + fn)),
+            'num_context': num_context,
+            'num_sents': num_sents
+        }, f_out, indent=4)
+
