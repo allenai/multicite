@@ -32,12 +32,13 @@ This script needs to be pointed at the directory for a SINGLE FOLD as --input:
 
 python train_seq_tagger.py \
     --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__3__1__07-01-02/0/ \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__3__1__07-01-02__batch32/0/ \
+    --output temp5/ \
     --model_name_or_path allenai/scibert_scivocab_uncased \
     --batch_size 32 \
     --warmup_steps 100 \
-    --max_epochs 5 \
+    --max_epochs 300 \
     --gpus 1
+    --use_intent
 
 
 """
@@ -57,15 +58,19 @@ from torch.nn.modules.loss import CrossEntropyLoss
 from torch.utils.data import DataLoader, Dataset
 from transformers import AdamW, AutoConfig, AutoModel, AutoTokenizer, get_linear_schedule_with_warmup
 
-from seq_tagger.const import SPECIAL_TOKENS, PAD_TOKEN_ID
+try:
+    from seq_tagger.const import SPECIAL_TOKENS, PAD_TOKEN_ID
+except ImportError:
+    from const import SPECIAL_TOKENS, PAD_TOKEN_ID
 
 
 class MyDataset(Dataset):
-    def __init__(self, data, tokenizer):
+    def __init__(self, data, tokenizer, use_intent: bool = True):
         self.data = data
         self.tokenizer = tokenizer
         all_labels = sorted(set([label for e in self.data for label in e["labels"]]))
         self.label_map = {label: i for i, label in enumerate(all_labels)}
+        self.use_intent = use_intent
 
     def __len__(self):
         return len(self.data)
@@ -77,8 +82,9 @@ class MyDataset(Dataset):
         text = cls_token.join([s.replace('[CLS]', 'CLS') for s in current_item["sentences"]])
         labels = current_item["labels"]
         token_ids = self.tokenizer.encode(text)
-        intent_id = dm.tokenizer._convert_token_to_id_with_added_voc(current_item['intent'])
-        token_ids = [intent_id] + token_ids
+        if self.use_intent:
+            intent_id = dm.tokenizer._convert_token_to_id_with_added_voc(current_item['intent'])
+            token_ids = [intent_id] + token_ids
 
         # TODO: ugly hack to deal with cls tokens that happen after truncation
         # we truncate sequence to length 512 - "num_cls_tokens appearing after 512"
@@ -116,6 +122,7 @@ class MyDataModule(LightningDataModule):
         batch_size: int = 8,
         cache_dir: str = "data/allenai-scibert_scivocab_uncased__11__1__07-01-02/0/",
         debug: int = None,
+        use_intent: bool = True,
         **kwargs,
     ):
         super().__init__()
@@ -126,6 +133,7 @@ class MyDataModule(LightningDataModule):
         self.tokenizer.add_special_tokens({'additional_special_tokens': SPECIAL_TOKENS})
         self.cache_dir = cache_dir
         self.debug = debug
+        self.use_intent = use_intent
 
     def setup(self, stage = 'fit'):
         def load_data(path):
@@ -143,9 +151,9 @@ class MyDataModule(LightningDataModule):
                 train_data = train_data[:self.debug]
                 val_data = val_data[:self.debug]
                 test_data = test_data[:self.debug]
-            self.train_dataset = MyDataset(train_data, self.tokenizer)
-            self.val_dataset = MyDataset(val_data, self.tokenizer)
-            self.test_dataset = MyDataset(test_data, self.tokenizer)
+            self.train_dataset = MyDataset(train_data, self.tokenizer, use_intent=self.use_intent)
+            self.val_dataset = MyDataset(val_data, self.tokenizer, use_intent=self.use_intent)
+            self.test_dataset = MyDataset(test_data, self.tokenizer, use_intent=self.use_intent)
 
     def prepare_data(self):
         assert os.path.exists(self.cache_dir)
@@ -330,6 +338,7 @@ if __name__ == '__main__':
     parser.add_argument('--warmup_steps', type=int, default=100)
     parser.add_argument('--max_epochs', type=int, default=1)
     parser.add_argument('--gpus', type=int, default=0)
+    parser.add_argument('--use_intent', action='store_true')
     parser.add_argument('--debug', type=int)     # this shrinks data sizes (default 8) to run through everything
     args = parser.parse_args()
 
@@ -337,7 +346,8 @@ if __name__ == '__main__':
                       max_seq_length=512,
                       batch_size=args.batch_size,
                       cache_dir=args.input,
-                      debug=args.debug)
+                      debug=args.debug,
+                      use_intent=args.use_intent)
     dm.setup()
 
     # double-check data
