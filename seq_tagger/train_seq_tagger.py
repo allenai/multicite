@@ -1,64 +1,43 @@
 """
 
-Sequence tagging
+Sequence tagging.  This script trains a SciBERT-based model, and saves checkpoints & dev predictions per epoch.
+Also saves test predictions at the end.
 
-# CUDA0
+Script runs when pointed to a directory for a *single* fold of train/dev/test data.
+THis data comes from `convert_raw_to_seq_tag_format.py`.
+
+
+The directory naming convention is:
+    /path/to/data    <- stores input data (train|dev|test)
+    /path/to/output  <- stores ckpts & predictions
+
+    Within each of these, should be a directory name like:
+        allenai-scibert_scivocab_uncased__3__1__07-01-02__batch32
+    which tells you:
+        the model: allenai/scibert_scivocab_uncased
+        the window: 3
+        the seed: 1
+        the split pcts: 0.7 train, 0.1 dev, 0.2 test
+        the batch size: 32
+
+    Within each of these, you should see each fold:
+        |-- 0/
+        |-- 1/
+        |-- 2/
+        ...
+
+
+This script needs to be pointed at the directory for a SINGLE FOLD as --input:
+
+
 python train_seq_tagger.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__9__1__07-01-02/0/ \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__9__1__07-01-02__batch32/0/ \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__3__1__07-01-02/0/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__3__1__07-01-02__batch32/0/ \
     --model_name_or_path allenai/scibert_scivocab_uncased \
     --batch_size 32 \
     --warmup_steps 100 \
     --max_epochs 5 \
     --gpus 1
-
-
-# CUDA3
-python train_seq_tagger.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__9__1__07-01-02/3/ \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__9__1__07-01-02__batch32/3/ \
-    --model_name_or_path allenai/scibert_scivocab_uncased \
-    --batch_size 32 \
-    --warmup_steps 100 \
-    --max_epochs 5 \
-    --gpus 1
-
-
-
-
-# CUDA1 (slow one)
-python train_seq_tagger.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__7__1__07-01-02/3/ \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__7__1__07-01-02__batch32/3/ \
-    --model_name_or_path allenai/scibert_scivocab_uncased \
-    --batch_size 32 \
-    --warmup_steps 100 \
-    --max_epochs 5 \
-    --gpus 1
-
-
-# CUDA2
-python train_seq_tagger.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__9__1__07-01-02/2/ \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__9__1__07-01-02__batch32/2/ \
-    --model_name_or_path allenai/scibert_scivocab_uncased \
-    --batch_size 32 \
-    --warmup_steps 100 \
-    --max_epochs 5 \
-    --gpus 1
-
-
-
-# Server5 CUDA2
-python train_seq_tagger.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__9__1__07-01-02/4/ \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__9__1__07-01-02__batch32/4/ \
-    --model_name_or_path allenai/scibert_scivocab_uncased \
-    --batch_size 32 \
-    --warmup_steps 100 \
-    --max_epochs 5 \
-    --gpus 1
-
 
 
 """
@@ -389,10 +368,6 @@ if __name__ == '__main__':
                       max_epochs=args.max_epochs,
                       callbacks=[checkpoint_callback])
     trainer.fit(model, dm)
-
-    # test this works
-    # trainer.save_checkpoint(os.path.join(args.output, 'model.ckpt'))
-    # new_model = MyTransformer.load_from_checkpoint(checkpoint_path=os.path.join(args.output, 'model.ckpt'))
 
     val_results = trainer.validate(model, dm.val_dataloader())
     test_results = trainer.test(model, dm.test_dataloader())
