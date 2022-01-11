@@ -127,7 +127,7 @@ if __name__ == '__main__':
             for intent, annotations in data['y'].items():
                 # original contexts stored in a structured way. just unfurl them into a single set of sent_ids for this eval
                 gold_sent_ids = sorted({sent_id for context in annotations['gold_contexts'] for sent_id in context}, key=lambda s: sent_id_to_pos(sent_id))
-                if paper_id in paper_id_to_intent_to_pred_sents:
+                if paper_id in paper_id_to_intent_to_pred_sents and intent in paper_id_to_intent_to_pred_sents[paper_id]:
                     pred_sent_ids = paper_id_to_intent_to_pred_sents[paper_id][intent]
                 else:
                     # in cases where window is too small, there may be no (oracle) example that results in a prediction. default to No Prediction.
