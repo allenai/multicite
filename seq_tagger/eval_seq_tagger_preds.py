@@ -226,7 +226,7 @@ if __name__ == '__main__':
     with open(os.path.join(args.output, f'macro_metrics_for_{args.pred_fname}.json'), 'w') as f_out:
         tp, tn, fp, fn, num_context, num_sents = 0, 0, 0, 0, 0, 0
         f1 = []
-        for paper_id, scores in paper_id_to_metrics.items()
+        for paper_id, scores in paper_id_to_metrics.items():
             tp += scores['tp']
             tn += scores['tn']
             fp += scores['fp']
@@ -235,8 +235,8 @@ if __name__ == '__main__':
             num_sents += scores['support']['total']
             f1.append(scores['f1'])
         json.dump({
-            'macro-f1': np.mean(f1),
-            'sd-macro-f1': np.std(f1),
+            'macro-f1': float(np.mean(f1)),
+            'sd-macro-f1': float(np.std(f1)),
             'micro-f1': tp / (tp + 0.5 * (fp + fn)),
             'num_context': num_context,
             'num_sents': num_sents
