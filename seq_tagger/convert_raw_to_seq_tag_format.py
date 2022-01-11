@@ -3,10 +3,13 @@
 Converts raw data to sequence tagging format  (see data_format.jsonl)
 
 
+python seq_tagger/convert_raw_to_seq_tag_format.py --input data/full-v20210918.json --output data/ --model allenai/scibert_scivocab_uncased --window 1 --train-prob 0.7 --dev-prob 0.1 --test-prob 0.2
+python seq_tagger/convert_raw_to_seq_tag_format.py --input data/full-v20210918.json --output data/ --model allenai/scibert_scivocab_uncased --window 3 --train-prob 0.7 --dev-prob 0.1 --test-prob 0.2
 python seq_tagger/convert_raw_to_seq_tag_format.py --input data/full-v20210918.json --output data/ --model allenai/scibert_scivocab_uncased --window 5 --train-prob 0.7 --dev-prob 0.1 --test-prob 0.2
 python seq_tagger/convert_raw_to_seq_tag_format.py --input data/full-v20210918.json --output data/ --model allenai/scibert_scivocab_uncased --window 7 --train-prob 0.7 --dev-prob 0.1 --test-prob 0.2
 python seq_tagger/convert_raw_to_seq_tag_format.py --input data/full-v20210918.json --output data/ --model allenai/scibert_scivocab_uncased --window 9 --train-prob 0.7 --dev-prob 0.1 --test-prob 0.2
 python seq_tagger/convert_raw_to_seq_tag_format.py --input data/full-v20210918.json --output data/ --model allenai/scibert_scivocab_uncased --window 11 --train-prob 0.7 --dev-prob 0.1 --test-prob 0.2
+
 
 """
 
