@@ -40,11 +40,12 @@ and Gold CONTEXT.  This script will only penalize models for if window is too sm
 
 To run this script, point it to the top-level directory containing all the CV Folds:
 
-python eval_pred.py \
+python eval_seq_tagger_preds.py \
     --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__5__1__07-01-02/ \
-    --pred /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02__batch32/ \
+    --pred_dirname /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02__batch32/ \
+    --pred_fname test-4 \
     --full /net/nfs2.s2-research/kylel/multicite-2022/data/full-v20210918.json \
-    --result /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02__batch32/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/results/allenai-scibert_scivocab_uncased__5__1__07-01-02__batch32/ \
 
 
 This should result in new files being created:
@@ -128,6 +129,8 @@ if __name__ == '__main__':
     parser.add_argument('--output', type=str, help='Path to an output directory.', default='output/allenai-scibert_scivocab_uncased__11__1__07-01-02/')
     args = parser.parse_args()
 
+    os.makedirs(args.output, exist_ok=True)
+
 
     # load the window-processed inputs to the model so that we can map the predictions back to original instances & sentences.
     # NOTE: this wont be comprehensive to every possible instance in Multicite dataset, due to window size processing.
@@ -173,7 +176,7 @@ if __name__ == '__main__':
                         paper_id_to_intent_to_pred_sents[paper_id][intent].append(sent_id)
 
     print(f'Saved {len(paper_id_to_intent_to_pred_sents)} papers worth of predictions.')
-    with open(os.path.join(args.result, f'all_preds_for_{args.pred_fname}.json'), 'w') as f_out:
+    with open(os.path.join(args.output, f'all_preds_for_{args.pred_fname}.json'), 'w') as f_out:
         json.dump(_jsonify_extraction_dict(paper_id_to_intent_to_pred_sents), f_out, indent=4)
 
 
@@ -197,7 +200,7 @@ if __name__ == '__main__':
 
 
     # write scores
-    with open(os.path.join(args.result, f'per_paper_metrics_for_{args.pred_fname}.csv'), 'w') as f_out:
+    with open(os.path.join(args.output, f'per_paper_metrics_for_{args.pred_fname}.csv'), 'w') as f_out:
         f_out.write(','.join(['paper_id', 'tp', 'tn', 'fp', 'fn', 'p', 'r', 'f1', 'num_context', 'num_not_context', 'n']))
         f_out.write('\n')
         for paper_id, scores in paper_id_to_metrics.items():
