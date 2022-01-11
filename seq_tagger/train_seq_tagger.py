@@ -26,7 +26,6 @@ python train_seq_tagger.py \
 
 
 
-
 # CUDA1 (slow one)
 python train_seq_tagger.py \
     --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__7__1__07-01-02/3/ \
@@ -40,10 +39,10 @@ python train_seq_tagger.py \
 
 # CUDA2
 python train_seq_tagger.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__5__1__07-01-02/1/ \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02__batch16/1/ \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__9__1__07-01-02/2/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__9__1__07-01-02__batch32/2/ \
     --model_name_or_path allenai/scibert_scivocab_uncased \
-    --batch_size 16 \
+    --batch_size 32 \
     --warmup_steps 100 \
     --max_epochs 5 \
     --gpus 1
@@ -52,15 +51,13 @@ python train_seq_tagger.py \
 
 # Server5 CUDA2
 python train_seq_tagger.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__5__1__07-01-02/4/ \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02__batch16/4/ \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__9__1__07-01-02/4/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__9__1__07-01-02__batch32/4/ \
     --model_name_or_path allenai/scibert_scivocab_uncased \
-    --batch_size 16 \
+    --batch_size 32 \
     --warmup_steps 100 \
     --max_epochs 5 \
     --gpus 1
-
-
 
 
 
