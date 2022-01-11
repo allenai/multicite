@@ -237,8 +237,8 @@ if __name__ == '__main__':
         json.dump({
             'macro-f1': float(np.mean(f1)),
             'sd-macro-f1': float(np.std(f1)),
-            'micro-f1': tp / (tp + 0.5 * (fp + fn)),
-            'num_context': num_context,
-            'num_sents': num_sents
+            'micro-f1': float(tp / (tp + 0.5 * (fp + fn))),
+            'num_context': int(num_context),
+            'num_sents': int(num_sents)
         }, f_out, indent=4)
 
