@@ -4,10 +4,10 @@ After training, get processing-agnostic test metrics.
 
 
 python eval_pred.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__11__1__07-01-02/ \
-    --pred /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__11__1__07-01-02__batch32/ \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__5__1__07-01-02/ \
+    --pred /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02__batch32/ \
     --full /net/nfs2.s2-research/kylel/multicite-2022/data/full-v20210918.json \
-    --result /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__11__1__07-01-02__batch32/ \
+    --result /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__5__1__07-01-02__batch32/ \
 
 
 """
@@ -91,7 +91,7 @@ if __name__ == '__main__':
         if fold.isnumeric() and os.path.isdir(os.path.join(args.pred, f'{fold}')):
             print(f'Processing fold {fold} in {args.pred}...')
             for fname in os.listdir(os.path.join(args.pred, f'{fold}')):
-                if 'test' in fname:
+                if 'test' in fname and 'metrics' not in fname:              # TODO: super hack, but eh...
                     with open(os.path.join(args.pred, f'{fold}', fname)) as f_in:
                         for line in f_in:
                             result = json.loads(line)
