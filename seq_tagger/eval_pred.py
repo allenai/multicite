@@ -29,7 +29,7 @@ def instance_id_to_paper_id_and_intent(instance_id: str) -> Tuple[str, str]:
 
 def sent_id_to_pos(sent_id: str) -> int:
     match = re.match(r'.+-C001-([0-9]+)', sent_id)
-    return int(match.group(1))
+    return int(match.group(1)) - 1      # data counts from 1
 
 def compute_paper_scores(pred_sent_ids: List[str], gold_sent_ids: List[str], paper_len: int) -> Dict:
     _g = {sent_id_to_pos(g) for g in gold_sent_ids}
