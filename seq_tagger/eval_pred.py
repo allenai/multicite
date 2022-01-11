@@ -33,10 +33,13 @@ def sent_id_to_pos(sent_id: str) -> int:
 
 def compute_paper_scores(pred_sent_ids: List[str], gold_sent_ids: List[str], paper_len: int) -> Dict:
     _g = {sent_id_to_pos(g) for g in gold_sent_ids}
-    _p = {sent_id_to_pos(p) for p in pred_sent_ids}
-
     y_true = [1 if i in _g else 0 for i in range(paper_len)]
-    y_pred = [1 if i in _p else 0 for i in range(paper_len)]
+
+    if pred_sent_ids:
+        _p = {sent_id_to_pos(p) for p in pred_sent_ids}
+        y_pred = [1 if i in _p else 0 for i in range(paper_len)]
+    else:
+        y_pred = [0 for _ in range(paper_len)]
 
     metrics = {}
     p, r, f1, support = precision_recall_fscore_support(y_true=y_true, y_pred=y_pred)
