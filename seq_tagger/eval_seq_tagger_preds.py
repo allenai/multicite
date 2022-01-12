@@ -146,6 +146,8 @@ def compute_per_paper_metrics(pred_dict: Dict, gold_dict: Dict) -> Dict:
         paper_id_to_metrics[paper_id]['f1'] = 2 * (p * r) / (p + r) if (p + r) > 0.0 else 0.0
         paper_id_to_metrics[paper_id]['num_gold_sent'] = len({sent for intent, data in gold_dict_for_paper['y'].items() for context in data['gold_contexts'] for sent in context})
         paper_id_to_metrics[paper_id]['num_gold_intent'] = len(gold_dict_for_paper['y'])
+        paper_id_to_metrics[paper_id]['num_gold_contexts'] = len([context for intent, data in gold_dict_for_paper['y'].items() for context in data['gold_contexts']])
+        paper_id_to_metrics[paper_id]['num_gold_cite_sents'] = len({cite_sent for intent, data in gold_dict_for_paper['y'].items() for cite_sent in data['cite_sentences']})
         paper_id_to_metrics[paper_id]['num_pred_sent'] = len({sent for intent, sents in pred_dict_for_paper.items() for sent in sents})
         paper_id_to_metrics[paper_id]['num_pred_intent'] = len(pred_dict_for_paper)
         paper_id_to_metrics[paper_id]['paper_len'] = len(gold_dict_for_paper['x'])
