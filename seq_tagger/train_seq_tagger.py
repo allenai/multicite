@@ -219,15 +219,9 @@ class MyTransformer(LightningModule):
         outputs = self(**batch)
         loss = outputs[0]
         self.log("loss", loss)
-        # TODO: delete
-        # print(f'{loss=loss}')
-        # print(f'{step=self.global_step}')
-        # if self.global_step % 8 == 0:
-        #     self.trainer.save_checkpoint(f'/home/kylel/multicite/temp3/manual_ckpts/{self.global_step}.ckpt')
         return loss
 
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        self.log("global_step", self.global_step)
         outputs = self(**batch)
         val_loss, logits, labels, instance_ids = outputs
         self.log("val_loss", val_loss)
@@ -235,24 +229,6 @@ class MyTransformer(LightningModule):
             preds = torch.argmax(logits, axis=1)
         elif self.hparams.num_labels == 1:
             preds = logits.squeeze()
-
-
-        # manual save
-        if self.global_step % 8 == 0:
-            self.trainer.save_checkpoint(f'/home/kylel/multicite/seq_tagger/temp3/manual_ckpts/{self.global_step}.ckpt')
-
-        # manual pred
-        print(f'Logging validation predictions for epoch {self.current_epoch}')
-        id_to_preds = defaultdict(list)
-        for id, pred, label, logit in zip(instance_ids.cpu().tolist(),
-                                          preds.cpu().tolist(),
-                                          labels.cpu().tolist(),
-                                          logits.cpu().tolist()):
-            id_to_preds[id].append({'pred': pred, 'label': label, 'logits': logit})
-        with open(os.path.join(self.val_pred_output_path, f'val-{self.current_epoch}-batch-{batch_idx}.jsonl'), 'w') as f_out:
-            for id, preds in sorted(id_to_preds.items()):
-                json.dump({'id': id, 'preds': preds}, f_out)
-                f_out.write('\n')
 
         return {"loss": val_loss, "preds": preds, "labels": labels, 'instance_ids': instance_ids, 'logits': logits}
 
@@ -265,35 +241,34 @@ class MyTransformer(LightningModule):
             preds = logits.squeeze()
         return {"loss": test_loss, "preds": preds, "labels": labels, 'instance_ids': instance_ids, 'logits': logits}
 
-    # def validation_epoch_end(self, outputs):
-    #     # self.log("global_step", self.global_step, prog_bar=True)
-    #
-    #     preds = torch.cat([x["preds"] for x in outputs]).detach()
-    #     labels = torch.cat([x["labels"] for x in outputs]).detach()
-    #     loss = torch.stack([x["loss"] for x in outputs]).mean()
-    #     logits = torch.cat([x["logits"] for x in outputs]).detach()
-    #     # self.log("val_loss", loss)
-    #     val_acc = self.metric_acc(preds, labels).cpu()
-    #     val_f1 = self.metric_f1(preds, labels).cpu()
-    #     self.log("val_acc", val_acc, prog_bar=True)
-    #     self.log("val_f1", val_f1, prog_bar=True)
-    #
-    #     print(f'Logging validation scores for epoch {self.current_epoch}')
-    #     with open(os.path.join(self.val_pred_output_path, f'val-metrics{self.current_epoch}.json'), 'w') as f_out:
-    #         json.dump({'val_loss': loss.cpu().tolist(), 'val_acc': val_acc.tolist(), 'val_f1': val_f1.tolist(),
-    #                    'global_step': self.global_step, 'epoch': self.current_epoch}, f_out, indent=4)
-    #
-    #     print(f'Logging validation predictions for epoch {self.current_epoch}')
-    #     ids = torch.cat([x["instance_ids"] for x in outputs]).detach().cpu()
-    #     id_to_preds = defaultdict(list)
-    #     for id, pred, label, logit in zip(ids.tolist(), preds.cpu().tolist(), labels.cpu().tolist(), logits.cpu().tolist()):
-    #         id_to_preds[id].append({'pred': pred, 'label': label, 'logits': logit})
-    #     with open(os.path.join(self.val_pred_output_path, f'val-{self.current_epoch}.jsonl'), 'w') as f_out:
-    #         for id, preds in sorted(id_to_preds.items()):
-    #             json.dump({'id': id, 'preds': preds}, f_out)
-    #             f_out.write('\n')
-    #
-    #     return loss
+    def validation_epoch_end(self, outputs):
+        self.log("global_step", self.global_step)
+        preds = torch.cat([x["preds"] for x in outputs]).detach()
+        labels = torch.cat([x["labels"] for x in outputs]).detach()
+        loss = torch.stack([x["loss"] for x in outputs]).mean()
+        logits = torch.cat([x["logits"] for x in outputs]).detach()
+        val_acc = self.metric_acc(preds, labels).cpu()
+        val_f1 = self.metric_f1(preds, labels).cpu()
+        self.log("val_acc", val_acc)
+        self.log("val_f1", val_f1, prog_bar=True)
+        self.log("avg_val_loss", loss, prog_bar=True)
+
+        print(f'Logging validation scores for epoch {self.current_epoch}')
+        with open(os.path.join(self.val_pred_output_path, f'val-metrics{self.current_epoch}.json'), 'w') as f_out:
+            json.dump({'val_loss': loss.cpu().tolist(), 'val_acc': val_acc.tolist(), 'val_f1': val_f1.tolist(),
+                       'global_step': self.global_step, 'epoch': self.current_epoch}, f_out, indent=4)
+
+        print(f'Logging validation predictions for epoch {self.current_epoch}')
+        ids = torch.cat([x["instance_ids"] for x in outputs]).detach().cpu()
+        id_to_preds = defaultdict(list)
+        for id, pred, label, logit in zip(ids.tolist(), preds.cpu().tolist(), labels.cpu().tolist(), logits.cpu().tolist()):
+            id_to_preds[id].append({'pred': pred, 'label': label, 'logits': logit})
+        with open(os.path.join(self.val_pred_output_path, f'val-{self.current_epoch}.jsonl'), 'w') as f_out:
+            for id, preds in sorted(id_to_preds.items()):
+                json.dump({'id': id, 'preds': preds}, f_out)
+                f_out.write('\n')
+
+        return loss
 
     def test_epoch_end(self, outputs):
         self.log("global_step", self.global_step, prog_bar=True)
@@ -395,9 +370,8 @@ if __name__ == '__main__':
 
     # callbacks
     checkpoint_callback = ModelCheckpoint(dirpath=args.output,
-                                          monitor='global_step',
                                           filename='{epoch:02d}-{step:02d}-{val_loss:.4f}-{val_f1:.4f}',
-                                          save_top_k=args.max_epochs)
+                                          save_top_k=-1)
 
     # setup & train
     os.makedirs(args.output, exist_ok=True)
