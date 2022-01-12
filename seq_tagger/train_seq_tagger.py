@@ -30,15 +30,16 @@ The directory naming convention is:
 This script needs to be pointed at the directory for a SINGLE FOLD as --input:
 
 
-python train_seq_tagger.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__3__1__07-01-02/0/ \
-    --output temp5/ \
+fold=4; window=3; python train_seq_tagger.py \
+    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__${window}__1__07-01-02/${fold}/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32__nointent/${fold}/ \
     --model_name_or_path allenai/scibert_scivocab_uncased \
     --batch_size 32 \
     --warmup_steps 100 \
-    --max_epochs 300 \
+    --max_epochs 5 \
     --gpus 1
-    --use_intent
+
+    #--use_intent
 
 
 """
@@ -240,6 +241,8 @@ class MyTransformer(LightningModule):
         return {"loss": test_loss, "preds": preds, "labels": labels, 'instance_ids': instance_ids, 'logits': logits}
 
     def validation_epoch_end(self, outputs):
+        self.log("global_step", self.global_step, prog_bar=True)
+
         preds = torch.cat([x["preds"] for x in outputs]).detach()
         labels = torch.cat([x["labels"] for x in outputs]).detach()
         loss = torch.stack([x["loss"] for x in outputs]).mean()
@@ -267,6 +270,8 @@ class MyTransformer(LightningModule):
         return loss
 
     def test_epoch_end(self, outputs):
+        self.log("global_step", self.global_step, prog_bar=True)
+
         preds = torch.cat([x["preds"] for x in outputs]).detach()
         labels = torch.cat([x["labels"] for x in outputs]).detach()
         loss = torch.stack([x["loss"] for x in outputs]).mean()
@@ -363,7 +368,7 @@ if __name__ == '__main__':
 
     # callbacks
     checkpoint_callback = ModelCheckpoint(dirpath=args.output,
-                                          monitor='val_loss',
+                                          monitor='global_step',
                                           filename='{epoch:02d}-{step:02d}-{val_loss:.4f}-{val_f1:.4f}',
                                           save_top_k=args.max_epochs)
 
