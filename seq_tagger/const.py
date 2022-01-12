@@ -1,6 +1,7 @@
 CITE_START = '[CITE]'
 CITE_END = '[/CITE]'
-SPECIAL_TOKENS = [CITE_START, CITE_END, '@BACK@', '@MOT@', '@FUT@', '@SIM@', '@DIF@', '@USE@', '@EXT@', '@UNSURE@']
+INTENT_TOKENS = ['@BACK@', '@MOT@', '@FUT@', '@SIM@', '@DIF@', '@USE@', '@EXT@', '@UNSURE@']
+SPECIAL_TOKENS = [CITE_START, CITE_END] + INTENT_TOKENS
 IGNORE_SENTS = {'----------------------------------', '****'}
 
 
