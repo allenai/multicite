@@ -53,7 +53,7 @@ from collections import Counter, defaultdict
 import torch
 import torchmetrics
 from pytorch_lightning import LightningDataModule, LightningModule, Trainer
-from pytorch_lightning.callbacks import ModelCheckpoint
+from pytorch_lightning.callbacks import ModelCheckpoint, LearningRateMonitor
 from torch.nn.modules.loss import CrossEntropyLoss
 from torch.utils.data import DataLoader, Dataset
 from transformers import AdamW, AutoConfig, AutoModel, AutoTokenizer, get_linear_schedule_with_warmup
@@ -372,6 +372,7 @@ if __name__ == '__main__':
     checkpoint_callback = ModelCheckpoint(dirpath=args.output,
                                           filename='{epoch:02d}-{step:02d}-{val_loss:.4f}-{val_f1:.4f}',
                                           save_top_k=-1)
+    lr_monitor = LearningRateMonitor(logging_interval='step')
 
     # setup & train
     os.makedirs(args.output, exist_ok=True)
@@ -382,7 +383,9 @@ if __name__ == '__main__':
     trainer = Trainer(gpus=args.gpus,
                       progress_bar_refresh_rate=5,
                       max_epochs=args.max_epochs,
-                      callbacks=[checkpoint_callback])
+                      callbacks=[checkpoint_callback, lr_monitor],
+                      val_check_interval=24,
+                      limit_val_batches=24)
     trainer.fit(model, dm)
 
 
