@@ -58,10 +58,17 @@ from torch.nn.modules.loss import CrossEntropyLoss
 from torch.utils.data import DataLoader, Dataset
 from transformers import AdamW, AutoConfig, AutoModel, AutoTokenizer, get_linear_schedule_with_warmup
 
+
+def get_world_size():
+    return torch.distributed.get_world_size()
+
+
 try:
     from seq_tagger.const import SPECIAL_TOKENS, PAD_TOKEN_ID
 except ImportError:
     from const import SPECIAL_TOKENS, PAD_TOKEN_ID
+
+
 
 
 class MyDataset(Dataset):
@@ -305,9 +312,20 @@ class MyTransformer(LightningModule):
             return
         # Get dataloader by calling it - train_dataloader() is called after setup() by default
         train_loader = self.train_dataloader()
-        tb_size = self.hparams.batch_size * max(1, self.trainer.gpus)
-        ab_size = self.trainer.accumulate_grad_batches * float(self.trainer.max_epochs)
-        self.total_steps = (len(train_loader.dataset) // tb_size) // ab_size
+
+        # TODO - probably wrong
+        # tb_size = self.hparams.batch_size * max(1, self.trainer.gpus)
+        # ab_size = self.trainer.accumulate_grad_batches * float(self.trainer.max_epochs)
+        # self.total_steps = (len(train_loader.dataset) // tb_size) // ab_size
+
+        if getattr(self.hparams, "max_steps", None):
+            self.total_steps = self.hparams.max_steps
+        else:
+            num_devices = get_world_size() if self.hparams.gpus > 1 or self.hparams.tpus != -1 else 1
+            # used in scheduler
+            self.total_steps = (
+                self.hparams.num_epochs * len(train_loader) / self.hparams.accumulate_grad_batches / num_devices
+            )
 
     def configure_optimizers(self):
         """Prepare optimizer and schedule (linear warmup and decay)"""
