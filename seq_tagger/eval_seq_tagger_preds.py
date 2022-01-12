@@ -1,244 +1,198 @@
 """
 
-Training should generate useful files like:
-
-|-- allenai-scibert_scivocab_uncased__3__1__07-01-02__batch32/
-    |-- 0/
-        # predictions
-        |-- val-0.jsonl     # per epoch
-        |-- val-1.jsonl
-        |-- val-2.jsonl
-        |-- val-3.jsonl
-        |-- val-4.jsonl
-        |-- test-4.jsonl    # at the end, test set
-        # checkpoints
-        |-- epoch=00-step=268-val_loss=0.3514-val_f1=0.8505.ckpt
-        |-- epoch=01-step=537-val_loss=0.3514-val_f1=0.8505.ckpt
-        |-- ...
-        # metrics
-        |-- val-metrics0.json
-        |-- val-metrics1.json
-        |-- val-metrics2.json
-        |-- val-metrics3.json
-        |-- val-metrics4.json
-        |-- test-metrics4.json
-    |-- 1/
-    |-- 2/
-    |-- 3/
-    |-- 4/                  # per fold
+Given compiled predictions (see the `collect_organize_preds_across_folds.py` output),
+compare them with the original dataset gold contexts, and produce metrics.
 
 
-Those metrics unfortunately aren't comparable across Window sizes (because the test data is different depending on processing).
+We output 2 types of metrics at 2 types of aggregation (across papers).
 
-As such, we want to do some evaluation that's fair across the models.  For each test set predictions, we'll map those back
-to the original sentences.  And use those to generate some F1 metrics.
-
-Note: These F1 metrics will be ORACLE scores because the test set predictions were done on inputs with Gold INTENT
-and Gold CONTEXT.  This script will only penalize models for if window is too small -->
-    then the model technically didn't predict anything & therefore will have lower recall.
+    - Metrics are either sentence-level (weak) or context-level (strict)
+    - Aggregations are either macro or micro-averaged across papers.
 
 
-To run this script, point it to the top-level directory containing all the CV Folds:
-
-window=3; python eval_seq_tagger_preds.py \
-    --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__${window}__1__07-01-02/ \
-    --pred_dirname /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/ \
-    --pred_fname test-4 \
-    --full /net/nfs2.s2-research/kylel/multicite-2022/data/full-v20210918.json \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/results/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/ \
+Note difference in JSON formats:
+    - Predictions are at a sentence level.  We don't do any experiments w/ predicting entire contexts.
+    - Gold is at a context level (which can be unfurled to be at a sentence level).
 
 
+Run script:
+
+    for window in 1 3 5 7 9 11
+    do
+      python seq_tagger/eval_seq_tagger_preds.py \
+      --pred output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/all_preds_for_test-4.json \
+      --gold data/full-v20210918.json \
+      --output results/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32.json
+    done
 
 
-
-This should result in new files being created:
-
-|-- allenai-scibert_scivocab_uncased__3__1__07-01-02__batch32/
-    |-- all_preds_for_test-4.jsonl
-    |-- per_paper_metrics_for_test-4.csv
-    |--
 
 
 """
 
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Set
 
-import os
 import json
 import argparse
-import re
 from collections import defaultdict
 
-from glob import glob
-
 import numpy as np
-from sklearn.metrics import confusion_matrix, precision_recall_fscore_support
+
+try:
+    from seq_tagger.const import INTENT_TOKENS
+except ImportError:
+    from const import INTENT_TOKENS
 
 
-def instance_id_to_paper_id_and_intent(instance_id: str) -> Tuple[str, str]:
-    match = re.match(r'(.+)__(@.+@)__[0-9]+', instance_id)
-    return match.group(1), match.group(2)
 
-def sent_id_to_pos(sent_id: str) -> int:
-    match = re.match(r'.+-C001-([0-9]+)', sent_id)
-    return int(match.group(1)) - 1      # in our multicite dataset, sent_ids counts from 1, not 0
+def _tp_fp_fn_given_paper(pred_dict_for_paper: Dict, gold_dict_for_paper: Dict) -> Tuple[int, int, int]:
+    tp, fp, fn = 0, 0, 0
 
-def compute_paper_scores(pred_sent_ids: List[str], gold_sent_ids: List[str], paper_len: int) -> Dict:
+    # convert to gold collection for sent-level evaluation
+    gold_intent_to_sents: Dict[str, Set[str]] = defaultdict(set)
+    for intent, d in gold_dict_for_paper['y'].items():
+        for context in d['gold_contexts']:
+            for sent_id in context:
+                gold_intent_to_sents[intent].add(sent_id)
 
-    # convert the gold & pred extractions to a vector of [0, 1, 0, 0, ...]
-    if gold_sent_ids:
-        _g = {sent_id_to_pos(g) for g in gold_sent_ids}
-        y_true = [1 if i in _g else 0 for i in range(paper_len)]
-    else:
-        y_true = [0 for _ in range(paper_len)]
+    # count predictions that match gold
+    for intent, sent_ids in pred_dict_for_paper.items():
+        for sent_id in sent_ids:
+            if intent in gold_intent_to_sents and sent_id in gold_intent_to_sents[intent]:
+                tp += 1
+            else:
+                fp += 1
 
-    if pred_sent_ids:
-        _p = {sent_id_to_pos(p) for p in pred_sent_ids}
-        y_pred = [1 if i in _p else 0 for i in range(paper_len)]
-    else:
-        y_pred = [0 for _ in range(paper_len)]
-
-    # use sklearn to compute basic metrics
-    metrics = {}
-    p, r, f1, support = precision_recall_fscore_support(y_true=y_true, y_pred=y_pred)
-    tn, fp, fn, tp = confusion_matrix(y_true=y_true, y_pred=y_pred).ravel()
-    metrics['tp'] = tp
-    metrics['tn'] = tn
-    metrics['fp'] = fp
-    metrics['fn'] = fn
-    metrics['p'] = p[-1]
-    metrics['r'] = r[-1]
-    metrics['f1'] = f1[-1]
-    metrics['support'] = {'not-context': support[0], 'context': support[-1], 'total': support.sum()}
-
-    return metrics
+    # count gold that we missed
+    for intent, sent_ids in gold_intent_to_sents.items():
+        for sent_id in sent_ids:
+            if intent not in pred_dict_for_paper:
+                fn += 1
+            elif sent_id not in pred_dict_for_paper[intent]:
+                fn += 1
+    return tp, fp, fn
 
 
-def _jsonify_extraction_dict(extraction_dict) -> Dict:
-    return {
-        paper_id: {
-            intent: sorted(pred_sents, key=lambda s: sent_id_to_pos(sent_id))
-            for intent, pred_sents in intent_to_pred_sents.items()
-        }
-        for paper_id, intent_to_pred_sents in extraction_dict.items()
-    }
+def _test_accum():
+    pred_dict_for_paper = {'@BACK@': ['1', '2', '3'], '@USE@': ['4', '5']}
+
+    # exact
+    gold_dict_for_paper = {'x': [], 'y': {'@BACK@': {'gold_contexts': [['1', '2', '3']]}, '@USE@': {'gold_contexts': [['4', '5']]}}}
+    tp, fp, fn = _tp_fp_fn_given_paper(pred_dict_for_paper=pred_dict_for_paper, gold_dict_for_paper=gold_dict_for_paper)
+    assert tp == 5 and fp == 0 and  fn == 0
+
+    # diff contexts but same gold sents
+    metrics = {'tp': 0, 'fp': 0, 'fn': 0}
+    gold_dict_for_paper = {'x': [], 'y': {'@BACK@': {'gold_contexts': [['1'], ['2'], ['3']]}, '@USE@': {'gold_contexts': [['4'], ['5']]}}}
+    tp, fp, fn = _tp_fp_fn_given_paper(pred_dict_for_paper=pred_dict_for_paper, gold_dict_for_paper=gold_dict_for_paper)
+    assert tp == 5 and fp == 0 and fn == 0
+
+    # pred correct sents, but wrong intents for them
+    metrics = {'tp': 0, 'fp': 0, 'fn': 0}
+    gold_dict_for_paper = {'x': [], 'y': {'@EXT@': {'gold_contexts': [['1'], ['2'], ['3']]}, '@BACK@': {'gold_contexts': [['4'], ['5']]}}}
+    tp, fp, fn = _tp_fp_fn_given_paper(pred_dict_for_paper=pred_dict_for_paper, gold_dict_for_paper=gold_dict_for_paper)
+    assert tp == 0 and fp == 5 and fn == 5
+
+    # pred correct intents, but wrong sents for them
+    metrics = {'tp': 0, 'fp': 0, 'fn': 0}
+    gold_dict_for_paper = {'x': [], 'y': {'@BACK@': {'gold_contexts': [['7'], ['8'], ['9']]}, '@USE@': {'gold_contexts': [['10'], ['11']]}}}
+    tp, fp, fn = _tp_fp_fn_given_paper(pred_dict_for_paper=pred_dict_for_paper, gold_dict_for_paper=gold_dict_for_paper)
+    assert tp == 0 and fp == 5 and fn == 5
+
+    # pred extra intents
+    metrics = {'tp': 0, 'fp': 0, 'fn': 0}
+    gold_dict_for_paper = {'x': [], 'y': {'@BACK@': {'gold_contexts': [['1'], ['2'], ['3']]}}}
+    tp, fp, fn = _tp_fp_fn_given_paper(pred_dict_for_paper=pred_dict_for_paper, gold_dict_for_paper=gold_dict_for_paper)
+    assert tp == 3 and fp == 2 and fn == 0
+
+    # pred missing intents for the same sents
+    metrics = {'tp': 0, 'fp': 0, 'fn': 0}
+    gold_dict_for_paper = {'x': [], 'y': {'@BACK@': {'gold_contexts': [['1', '2', '3']]}, '@USE@': {'gold_contexts': [['4', '5']]}, '@EXT@': {'gold_contexts': [['1', '2', '3'], ['4', '5']]}}}
+    tp, fp, fn = _tp_fp_fn_given_paper(pred_dict_for_paper=pred_dict_for_paper, gold_dict_for_paper=gold_dict_for_paper)
+    assert tp == 5 and fp == 0 and fn == 5
+
+    # pred extra sents for same intents
+    metrics = {'tp': 0, 'fp': 0, 'fn': 0}
+    gold_dict_for_paper = {'x': [], 'y': {'@BACK@': {'gold_contexts': [['1', '2']]}, '@USE@': {'gold_contexts': [['4']]}}}
+    tp, fp, fn = _tp_fp_fn_given_paper(pred_dict_for_paper=pred_dict_for_paper, gold_dict_for_paper=gold_dict_for_paper)
+    assert tp == 3 and fp == 2 and fn == 0
+
+    # pred missing sents (either same or diff context) for same intents
+    metrics = {'tp': 0, 'fp': 0, 'fn': 0}
+    gold_dict_for_paper = {'x': [], 'y': {'@BACK@': {'gold_contexts': [['1', '2', '3'], ['4']]}, '@USE@': {'gold_contexts': [['4', '5', '6']]}}}
+    tp, fp, fn = _tp_fp_fn_given_paper(pred_dict_for_paper=pred_dict_for_paper, gold_dict_for_paper=gold_dict_for_paper)
+    assert tp == 5 and fp == 0 and fn == 2
+
+    # missing preds altogether
+    pred_dict_for_paper = {}
+    gold_dict_for_paper = {'x': [], 'y': {'@BACK@': {'gold_contexts': [['1', '2', '3']]}, '@USE@': {'gold_contexts': [['4', '5']]}}}
+    tp, fp, fn = _tp_fp_fn_given_paper(pred_dict_for_paper=pred_dict_for_paper, gold_dict_for_paper=gold_dict_for_paper)
+    assert tp == 0 and fp == 0 and fn == 0
+
+
+def compute_per_paper_metrics(pred_dict: Dict, gold_dict: Dict) -> Dict:
+    paper_id_to_metrics = defaultdict(dict)
+
+    for paper_id, gold_dict_for_paper in gold_dict.items():
+        pred_dict_for_paper = pred_dict.get(paper_id, {})
+        tp, fp, fn = _tp_fp_fn_given_paper(pred_dict_for_paper=pred_dict_for_paper, gold_dict_for_paper=gold_dict_for_paper)
+        p = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+        r = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+        paper_id_to_metrics[paper_id]['tp'] = tp
+        paper_id_to_metrics[paper_id]['fp'] = fp
+        paper_id_to_metrics[paper_id]['fn'] = fn
+        paper_id_to_metrics[paper_id]['p'] = p
+        paper_id_to_metrics[paper_id]['r'] = r
+        paper_id_to_metrics[paper_id]['f1'] = 2 * (p * r) / (p + r) if (p + r) > 0.0 else 0.0
+        paper_id_to_metrics[paper_id]['num_gold_sent'] = len({sent for intent, data in gold_dict_for_paper['y'].items() for context in data['gold_contexts'] for sent in context})
+        paper_id_to_metrics[paper_id]['num_gold_intent'] = len(gold_dict_for_paper['y'])
+        paper_id_to_metrics[paper_id]['num_pred_sent'] = len({sent for intent, sents in pred_dict_for_paper.items() for sent in sents})
+        paper_id_to_metrics[paper_id]['num_pred_intent'] = len(pred_dict_for_paper)
+        paper_id_to_metrics[paper_id]['paper_len'] = len(gold_dict_for_paper['x'])
+
+    return paper_id_to_metrics
+
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--input', type=str, help='Directory path to cross-fold validation model input files.', default='data/allenai-scibert_scivocab_uncased__11__1__07-01-02/')
-    parser.add_argument('--pred_dirname', type=str, help='Directory path to cross-fold model output files.', default='output/allenai-scibert_scivocab_uncased__11__1__07-01-02/')
-    parser.add_argument('--pred_fname', type=str, help='Name of JSONL file containing predictions. Should be same across ALL CV folds.', default='test-4')
-    parser.add_argument('--full', type=str, help='Directory path to original full release dataset (processing agnostic).', default='data/full-v20210918.json')
-    parser.add_argument('--output', type=str, help='Path to an output directory.', default='output/allenai-scibert_scivocab_uncased__11__1__07-01-02/')
+    parser.add_argument('--pred', type=str, help='Path to JSON containing predicted sentences')
+    parser.add_argument('--gold', type=str, help='Path to JSON containing gold contexts. This is the original dataset.')
+    parser.add_argument('--output', type=str, help='Path to an output JSON file.')
     args = parser.parse_args()
 
-    os.makedirs(args.output, exist_ok=True)
+    # load pred
+    with open(args.pred) as f_in:
+        pred_dict = json.load(f_in)
 
+    # load gold
+    with open(args.gold) as f_in:
+        gold_dict = json.load(f_in)
 
-    # load the window-processed inputs to the model so that we can map the predictions back to original instances & sentences.
-    # NOTE: this wont be comprehensive to every possible instance in Multicite dataset, due to window size processing.
-    id_to_instance_id = {}
-    id_to_sent_ids = {}
-    with open(os.path.join(args.input, 'full.json')) as f_in:
-        all_examples = json.load(f_in)['data']
-        for example in all_examples:
-            id = example['id']
-            instance_id = example['instance_id']
-            sent_ids = example['sent_ids']
-            id_to_instance_id[id] = instance_id
-            id_to_sent_ids[id] = sent_ids
-    print(f'Loaded {len(all_examples)} examples and organized by ID')
+    # calculate bunch of stuff per paper
+    per_paper_metrics = dict(compute_per_paper_metrics(pred_dict=pred_dict, gold_dict=gold_dict))
 
+    # calculate macro metrics
+    metric_logger = defaultdict(list)
+    for paper_id, paper_metrics in per_paper_metrics.items():
+        for metric_name, metric_value in paper_metrics.items():
+            metric_logger[metric_name].append(metric_value)
+    metrics = {}
+    for metric_name, metric_values in metric_logger.items():
+        metrics[f'mean-{metric_name}'] = f'{np.mean(metric_values)}'
+        metrics[f'std-{metric_name}'] = f'{np.std(metric_values)}'
 
-    # load model predictions across all the folds & then organize them into predicted contexts (per document). for example:
-    # {
-    #     'ABC_ffcefdc73338187d4a6b2dc2f0bb47_28': {
-    #         '@BACK@': ['ffcefdc73338187d4a6b2dc2f0bb47-C001-6', 'ffcefdc73338187d4a6b2dc2f0bb47-C001-27', 'ffcefdc73338187d4a6b2dc2f0bb47-C001-44'],
-    #         '@DIF@': ['ffcefdc73338187d4a6b2dc2f0bb47-C001-111'],
-    #         ...
-    #     },
-    #     ...
-    # }
-    paper_id_to_intent_to_pred_sents = defaultdict(lambda: defaultdict(list))
-    for infile in glob(os.path.join(args.pred_dirname, '*/', f'{args.pred_fname}.jsonl')):
-        print(f'Processing {infile}...')
-        with open(infile) as f_in:
-            for line in f_in:
-                result = json.loads(line)
-                # pull out data
-                id = result['id']
-                preds = [p['pred'] for p in result['preds']]                    # list of 1s or 0s
-                labels = [p['label'] for p in result['preds']]                  # list of 1s or 0s
-                assert len(preds) == len(labels) == len(id_to_sent_ids[id])     # sanity check. should all be size of window.
-                # map back to instance_id and sent_ids
-                paper_id, intent = instance_id_to_paper_id_and_intent(instance_id=id_to_instance_id[id])
-                for pred, label, sent_id in zip(preds, labels, id_to_sent_ids[id]):
-                    # prediction of 0 stands for a positive 'context' prediction.
-                    # also, dont add duplicate sent_ids to context.
-                    if pred == 0 and sent_id not in paper_id_to_intent_to_pred_sents[paper_id][intent]:
-                        paper_id_to_intent_to_pred_sents[paper_id][intent].append(sent_id)
+    # micro metrics
+    overall_tp = sum(metric_logger['tp'])
+    overall_fp = sum(metric_logger['fp'])
+    overall_fn = sum(metric_logger['fn'])
+    overall_p = overall_tp / (overall_tp + overall_fp) if (overall_tp + overall_fp) > 0 else 0.0
+    overall_r = overall_tp / (overall_tp + overall_fn) if (overall_tp + overall_fn) > 0 else 0.0
+    metrics['overall-p'] = overall_p
+    metrics['overall-r'] = overall_r
+    metrics['overall-f1'] = 2 * (overall_p * overall_r) / (overall_p + overall_r) if (overall_p + overall_r) > 0.0 else 0.0
+    metrics['num_papers'] = len(per_paper_metrics)
 
-    print(f'Saved {len(paper_id_to_intent_to_pred_sents)} papers worth of predictions.')
-    with open(os.path.join(args.output, f'all_preds_for_{args.pred_fname}.json'), 'w') as f_out:
-        json.dump(_jsonify_extraction_dict(paper_id_to_intent_to_pred_sents), f_out, indent=4)
-
-
-    # finally, compare the predicted extractions to original contexts.
-    paper_id_to_metrics = {}
-    with open(args.full) as f_in:
-        full = json.load(f_in)
-        for paper_id, data in full.items():
-            paper_len = len(data['x'])
-            for intent, annotations in data['y'].items():
-                # original contexts stored in a structured way. just unfurl them into a single set of sent_ids for this eval
-                gold_sent_ids = sorted({sent_id for context in annotations['gold_contexts'] for sent_id in context}, key=lambda s: sent_id_to_pos(sent_id))
-                if paper_id in paper_id_to_intent_to_pred_sents and intent in paper_id_to_intent_to_pred_sents[paper_id]:
-                    pred_sent_ids = paper_id_to_intent_to_pred_sents[paper_id][intent]
-                else:
-                    # in cases where window is too small, there may be no (oracle) example that results in a prediction. default to No Prediction.
-                    pred_sent_ids = []
-                metrics = compute_paper_scores(pred_sent_ids=pred_sent_ids, gold_sent_ids=gold_sent_ids, paper_len=paper_len)
-                paper_id_to_metrics[paper_id] = metrics
-
-
-
-    # write scores
-    with open(os.path.join(args.output, f'per_paper_metrics_for_{args.pred_fname}.csv'), 'w') as f_out:
-        f_out.write(','.join(['paper_id', 'tp', 'tn', 'fp', 'fn', 'p', 'r', 'f1', 'num_context', 'num_not_context', 'n']))
-        f_out.write('\n')
-        for paper_id, scores in paper_id_to_metrics.items():
-            f_out.write(','.join([
-                paper_id,
-                f"{scores['tp']}",
-                f"{scores['tn']}",
-                f"{scores['fp']}",
-                f"{scores['fn']}",
-                f"{scores['p']}",
-                f"{scores['r']}",
-                f"{scores['f1']}",
-                f"{scores['support']['context']}",
-                f"{scores['support']['not-context']}",
-                f"{scores['support']['total']}"
-            ]))
-            f_out.write('\n')
-
-    with open(os.path.join(args.output, f'macro_metrics_for_{args.pred_fname}.json'), 'w') as f_out:
-        tp, tn, fp, fn, num_context, num_sents = 0, 0, 0, 0, 0, 0
-        f1 = []
-        for paper_id, scores in paper_id_to_metrics.items():
-            tp += scores['tp']
-            tn += scores['tn']
-            fp += scores['fp']
-            fn += scores['fn']
-            num_context += scores['support']['context']
-            num_sents += scores['support']['total']
-            f1.append(scores['f1'])
-        json.dump({
-            'macro-f1': float(np.mean(f1)),
-            'sd-macro-f1': float(np.std(f1)),
-            'micro-f1': float(tp / (tp + 0.5 * (fp + fn))),
-            'num_context': int(num_context),
-            'num_sents': int(num_sents)
-        }, f_out, indent=4)
-
+    # write
+    with open(args.output, 'w') as f_out:
+        json.dump(metrics, f_out, indent=4)
