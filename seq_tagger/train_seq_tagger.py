@@ -30,16 +30,15 @@ The directory naming convention is:
 This script needs to be pointed at the directory for a SINGLE FOLD as --input:
 
 
-fold=4; window=3; python train_seq_tagger.py \
+fold=0; window=1; python train_seq_tagger.py \
     --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__${window}__1__07-01-02/${fold}/ \
-    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32__nointent/${fold}/ \
+    --output test/${fold}/ \
     --model_name_or_path allenai/scibert_scivocab_uncased \
     --batch_size 32 \
     --warmup_steps 100 \
     --max_epochs 5 \
-    --gpus 1
-
-    #--use_intent
+    --gpus 1 \
+    --use_intent
 
 
 """
@@ -255,7 +254,8 @@ class MyTransformer(LightningModule):
 
         print(f'Logging validation scores for epoch {self.current_epoch}')
         with open(os.path.join(self.val_pred_output_path, f'val-metrics{self.current_epoch}.json'), 'w') as f_out:
-            json.dump({'val_loss': loss.cpu().tolist(), 'val_acc': val_acc.tolist(), 'val_f1': val_f1.tolist()}, f_out, indent=4)
+            json.dump({'val_loss': loss.cpu().tolist(), 'val_acc': val_acc.tolist(), 'val_f1': val_f1.tolist(),
+                       'global_step': self.global_step, 'epoch': self.current_epoch}, f_out, indent=4)
 
         print(f'Logging validation predictions for epoch {self.current_epoch}')
         ids = torch.cat([x["instance_ids"] for x in outputs]).detach().cpu()
@@ -284,7 +284,8 @@ class MyTransformer(LightningModule):
 
         print(f'Logging test scores for epoch {self.current_epoch}')
         with open(os.path.join(self.val_pred_output_path, f'test-metrics{self.current_epoch}.json'), 'w') as f_out:
-            json.dump({'test_loss': loss.cpu().tolist(), 'test_acc': test_acc.tolist(), 'test_f1': test_f1.tolist()}, f_out, indent=4)
+            json.dump({'test_loss': loss.cpu().tolist(), 'test_acc': test_acc.tolist(), 'test_f1': test_f1.tolist(),
+                       'global_step': self.global_step, 'epoch': self.current_epoch}, f_out, indent=4)
 
         print(f'Logging test predictions for epoch {self.current_epoch}')
         ids = torch.cat([x["instance_ids"] for x in outputs]).detach().cpu()
@@ -384,6 +385,8 @@ if __name__ == '__main__':
                       callbacks=[checkpoint_callback])
     trainer.fit(model, dm)
 
-    val_results = trainer.validate(model, dm.val_dataloader())
+
+    # TODO: check metrics for each ckpt.  pick best on val for that fold.
+
     test_results = trainer.test(model, dm.test_dataloader())
 
