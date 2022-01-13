@@ -147,7 +147,6 @@ if __name__ == '__main__':
     parser.add_argument('--input', type=str, help='Directory path to cross-fold validation model input files.', default='data/allenai-scibert_scivocab_uncased__11__1__07-01-02/')
     parser.add_argument('--pred_dirname', type=str, help='Directory path to cross-fold model output files.', default='output/allenai-scibert_scivocab_uncased__11__1__07-01-02__batch32/')
     parser.add_argument('--pred_fname', type=str, help='Name of JSONL file containing predictions. Should be same across ALL CV folds.', default='test-4')
-    parser.add_argument('--full', type=str, help='Directory path to original full release dataset (processing agnostic).', default='data/full-v20210918.json')
     parser.add_argument('--output', type=str, help='Path to an output directory.', default='results/allenai-scibert_scivocab_uncased__11__1__07-01-02/')
     args = parser.parse_args()
 
