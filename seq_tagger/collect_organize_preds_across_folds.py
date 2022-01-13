@@ -1,23 +1,20 @@
 """
 
 
-Training should generate useful files like:
+Training or Loading Checkpoints & performing Prediction should generate useful files like:
 
 |-- allenai-scibert_scivocab_uncased__3__1__07-01-02__batch32/
     |-- 0/
-        # predictions
-        |-- val-0.jsonl     # per epoch
+        |-- val-0.jsonl             # << prediction files we use
         |-- val-1.jsonl
         |-- val-2.jsonl
         |-- val-3.jsonl
         |-- val-4.jsonl
-        |-- test-4.jsonl    # at the end, test set
-        # checkpoints
-        |-- epoch=00-step=268-val_loss=0.3514-val_f1=0.8505.ckpt
+        |-- test-4.jsonl
+        |-- epoch=00-step=268-val_loss=0.3514-val_f1=0.8505.ckpt        # << checkpoints out of Training
         |-- epoch=01-step=537-val_loss=0.3514-val_f1=0.8505.ckpt
         |-- ...
-        # metrics
-        |-- val-metrics0.json
+        |-- val-metrics0.json       # << training, Load Ckpt & Pred will both produce these for debugging purposes
         |-- val-metrics1.json
         |-- val-metrics2.json
         |-- val-metrics3.json
@@ -25,8 +22,8 @@ Training should generate useful files like:
         |-- test-metrics4.json
     |-- 1/
     |-- 2/
-    |-- 3/
-    |-- 4/                  # per fold
+    |-- 3/                  # << fold 3
+    |-- 4/                  # << fold 4
 
 
 Those metrics unfortunately aren't comparable across Window sizes (because the test data is different depending on processing).
@@ -41,21 +38,41 @@ To run this script, point it to the top-level directory containing all the CV Fo
 
     IntentStatus=("__nointent/" "/")
 
+    pred_dir="oracle_test_val_ckpts_epochs_0_1_2_3"
     for intent in ${IntentStatus[*]}
     do
         for window in 1 3 5 7 9 11
         do
-          python seq_tagger/collect_organize_preds_across_folds.py \
-          --input data/allenai-scibert_scivocab_uncased__${window}__1__07-01-02/ \
-          --pred_dirname output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32${intent} \
-          --pred_fname test-4 \
-          --full data/full-v20210918.json \
-          --output output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32${intent}
+            data="allenai-scibert_scivocab_uncased__${window}__1__07-01-02"
+            model="${data}__batch32${intent}"
+            for ckpt in 0 1 2 3
+            do
+              python seq_tagger/collect_organize_preds_across_folds.py \
+              --input data/${data}/ \
+              --pred_dirname ${pred_dir}/${model} \
+              --pred_fname test-${ckpt} \
+              --full data/full-v20210918.json \
+              --output ${pred_dir}/${model}
+            done
         done
     done
 
 
-This should result in new file being created at *OUTPUT*.
+This should result in new file being created at the output dir.  In this example, we wrote it to same dir where predictions are, so
+the output files should look like:
+
+|-- allenai-scibert_scivocab_uncased__1__1__07-01-02__batch32/
+    |-- 0/
+        |-- test-0.jsonl
+        |-- test-1.jsonl
+        |-- test-2.jsonl
+        ...
+    |-- 1/
+    ...
+    |-- all_preds_for_test-0.json
+    |-- all_preds_for_test-1.json
+    |-- all_preds_for_test-2.json
+    |-- all_preds_for_test-3.json
 
 """
 

@@ -13,24 +13,36 @@ Usage?
 
 For example, let's use this to get the predictions for every epoch on the test data (as opposed to just epoch 4):
 
-
+    data_dir="/net/nfs2.corp/s2-research/kylel/multicite-2022/data"
+    ckpt_dir="/net/nfs2.corp/s2-research/kylel/multicite-2022/output"
+    output_dir="/net/nfs2.corp/s2-research/kylel/multicite-2022/test_preds"
     for window in 1 3 5 7 9 11
     do
         for fold in 0 1 2 3 4
         do
             for epoch in 0 1 2 3
             do
-              ckpt="/net/nfs2.corp/s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/${fold}/epoch=0${epoch}*.ckpt"
+              temp_dir="${output_dir}/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/${fold}/${epoch}/"
+              ckpt="${ckpt_dir}/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/${fold}/epoch=0${epoch}*.ckpt"
               python load_ckpt_and_predict.py \
-              --input /net/nfs2.corp/s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__${window}__1__07-01-02/${fold}/ \
+              --input ${data_dir}/allenai-scibert_scivocab_uncased__${window}__1__07-01-02/${fold}/ \
               --ckpt ${ckpt} \
-              --output /net/nfs2.corp/s2-research/kylel/multicite-2022/test_output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/${fold}/${epoch}/ \
+              --output ${temp_dir}/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/${fold}/${epoch}/ \
               --batch_size 32 \
               --gpus 1 \
               --use_intent
+
+              mv ${temp_dir}/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/${fold}/${epoch}/test-0.jsonl \
+              ${output_dir}/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/${fold}/test-${epoch}.jsonl
+
+              mv ${temp_dir}/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/${fold}/${epoch}/test-metrics0.json \
+              ${output_dir}/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/${fold}/test-metrics${epoch}.json
+
+              rmdir ${temp_dir}
             done
         done
     done
+
 
 
 which will produce output like:
