@@ -17,14 +17,21 @@ Note difference in JSON formats:
 
 Run script:
 
-
-
+    gold_data="data/full-v20210918.json"
+    pred_dir="oracle_test_val_ckpts_epochs_0_1_2_3"
+    target_dir=${pred_dir}
+    intent="__nointent"
     for window in 1 3 5 7 9 11
     do
-      python seq_tagger/eval_seq_tagger_preds.py \
-      --pred output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/all_preds_for_test-4.json \
-      --gold data/full-v20210918.json \
-      --output results/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32.json
+        data="allenai-scibert_scivocab_uncased__${window}__1__07-01-02"
+        model="${data}__batch32${intent}"
+        for ckpt in 0 1 2 3
+        do
+            python seq_tagger/eval_seq_tagger_preds.py \
+            --pred ${pred_dir}/${model}/all_preds_for_test-${ckpt}.json \
+            --gold ${gold_data} \
+            --output ${target_dir}/${model}/results_for_test-${ckpt}.json
+        done
     done
 
 *NOTE* adapt this for the __nointent__ cases as well
