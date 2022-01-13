@@ -84,7 +84,7 @@ class MyDataset(Dataset):
         labels = current_item["labels"]
         token_ids = self.tokenizer.encode(text)
         if self.use_intent:
-            intent_id = dm.tokenizer._convert_token_to_id_with_added_voc(current_item['intent'])
+            intent_id = self.tokenizer._convert_token_to_id_with_added_voc(current_item['intent'])
             token_ids = [intent_id] + token_ids
 
         # TODO: ugly hack to deal with cls tokens that happen after truncation
