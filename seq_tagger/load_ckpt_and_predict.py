@@ -22,15 +22,37 @@ For example, let's use this to get the predictions for every epoch on the test d
             do
               ckpt="/net/nfs2.corp/s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/${fold}/epoch=0${epoch}*.ckpt"
               python load_ckpt_and_predict.py \
-              --input /net/nfs2.corp/s2-research/kylel/multicite-2022/input/allenai-scibert_scivocab_uncased__${window}__1__07-01-02/ \
+              --input /net/nfs2.corp/s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__${window}__1__07-01-02/${fold}/ \
               --ckpt ${ckpt} \
-              --output /net/nfs2.corp/s2-research/kylel/multicite-2022/test_output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/${fold}/
+              --output /net/nfs2.corp/s2-research/kylel/multicite-2022/test_output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/${fold}/${epoch}/ \
               --batch_size 32 \
               --gpus 1 \
               --use_intent
             done
         done
     done
+
+
+which will produce output like:
+
+|-- test_output/
+    |-- allenai-scibert_scivocab_uncased__1__1__07-01-02__batch32/
+        |-- 0                               # fold
+            |-- 0                           # batch
+                |-- test-0.jsonl            # predictions
+                |-- test-metrics0.json      # not-quite-usable metrics
+            |-- 1
+            |-- 2
+        |-- 1
+        |-- 2
+    |-- allenai-scibert_scivocab_uncased__3__1__07-01-02__batch32/
+    |-- allenai-scibert_scivocab_uncased__5__1__07-01-02__batch32/
+
+
+
+*NOTE* you'll need to adapt the commands in this script to handle the __nointent__ cases.
+
+
 
 
 """
@@ -79,6 +101,6 @@ if __name__ == '__main__':
 
     # do the prediction
     results = trainer.test(model, dm.test_dataloader())
-    assert os.path.exists(os.path.join(args.output, 'test-0.jsonl'))
+    assert os.path.exists(os.path.join(args.output, 'test-0.jsonl'))        # it's called test-0.jsonl cuz of how DM is set up :/
 
 
