@@ -32,7 +32,7 @@ This script needs to be pointed at the directory for a SINGLE FOLD as --input:
 
 fold=0; window=1; python train_seq_tagger.py \
     --input /net/nfs2.s2-research/kylel/multicite-2022/data/allenai-scibert_scivocab_uncased__${window}__1__07-01-02/${fold}/ \
-    --output test/${fold}/ \
+    --output /net/nfs2.s2-research/kylel/multicite-2022/output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/${fold}/ \
     --model_name_or_path allenai/scibert_scivocab_uncased \
     --batch_size 32 \
     --warmup_steps 100 \
@@ -348,6 +348,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_name_or_path', type=str, default='allenai/scibert_scivocab_uncased')
     parser.add_argument('--batch_size', type=int, default=8)
     parser.add_argument('--warmup_steps', type=int, default=100)
+    parser.add_argument('--max_steps', type=int, default=5000)
     parser.add_argument('--max_epochs', type=int, default=1)
     parser.add_argument('--gpus', type=int, default=0)
     parser.add_argument('--use_intent', action='store_true')
@@ -382,12 +383,14 @@ if __name__ == '__main__':
     # setup & train
     os.makedirs(args.output, exist_ok=True)
     model = MyTransformer(warmup_steps=args.warmup_steps,
+                          max_steps=args.max_steps,
                           tokenizer=dm.tokenizer,
                           val_pred_output_path=args.output,
                           test_pred_output_path=args.output)
     trainer = Trainer(gpus=args.gpus,
                       progress_bar_refresh_rate=5,
                       max_epochs=args.max_epochs,
+                      max_steps=args.max_steps,
                       callbacks=[checkpoint_callback, lr_monitor])
     trainer.fit(model, dm)
 
