@@ -38,14 +38,20 @@ to the original sentences.
 
 To run this script, point it to the top-level directory containing all the CV Folds:
 
-    for window in 1 3 5 7 9 11
+
+    IntentStatus=("__nointent/" "/")
+
+    for intent in ${IntentStatus[*]}
     do
-      python seq_tagger/collect_organize_preds_across_folds.py \
-      --input data/allenai-scibert_scivocab_uncased__${window}__1__07-01-02/ \
-      --pred_dirname output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/ \
-      --pred_fname test-4 \
-      --full data/full-v20210918.json \
-      --output output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32/
+        for window in 1 3 5 7 9 11
+        do
+          python seq_tagger/collect_organize_preds_across_folds.py \
+          --input data/allenai-scibert_scivocab_uncased__${window}__1__07-01-02/ \
+          --pred_dirname output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32${intent} \
+          --pred_fname test-4 \
+          --full data/full-v20210918.json \
+          --output output/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32${intent}
+        done
     done
 
 
