@@ -17,6 +17,8 @@ Note difference in JSON formats:
 
 Run script:
 
+
+
     for window in 1 3 5 7 9 11
     do
       python seq_tagger/eval_seq_tagger_preds.py \
@@ -25,7 +27,7 @@ Run script:
       --output results/allenai-scibert_scivocab_uncased__${window}__1__07-01-02__batch32.json
     done
 
-
+*NOTE* adapt this for the __nointent__ cases as well
 
 
 """
