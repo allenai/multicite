@@ -59,16 +59,10 @@ from torch.utils.data import DataLoader, Dataset
 from transformers import AdamW, AutoConfig, AutoModel, AutoTokenizer, get_linear_schedule_with_warmup
 
 
-def get_world_size():
-    return torch.distributed.get_world_size()
-
-
 try:
     from seq_tagger.const import SPECIAL_TOKENS, PAD_TOKEN_ID
 except ImportError:
     from const import SPECIAL_TOKENS, PAD_TOKEN_ID
-
-
 
 
 class MyDataset(Dataset):
@@ -187,11 +181,6 @@ class MyTransformer(LightningModule):
         test_pred_output_path: str,
         model_name_or_path: str = "allenai/scibert_scivocab_uncased",
         num_labels: int = 2,
-        learning_rate: float = 3e-5,
-        adam_epsilon: float = 1e-8,
-        warmup_steps: int = 0,
-        weight_decay: float = 0.0,
-        batch_size: int = 32,
         **kwargs,
     ):
         super().__init__()
@@ -202,7 +191,6 @@ class MyTransformer(LightningModule):
         self.model.resize_token_embeddings(len(self.tokenizer))
         self.metric_acc = torchmetrics.Accuracy()
         self.metric_f1 = torchmetrics.F1(average='macro', num_classes=num_labels)
-        self.batch_size = batch_size
         self.classifier = torch.nn.Linear(self.model.config.hidden_size, num_labels)
         self.loss_fn = CrossEntropyLoss()
         self.val_pred_output_path = val_pred_output_path
@@ -236,12 +224,12 @@ class MyTransformer(LightningModule):
             preds = torch.argmax(logits, axis=1)
         elif self.hparams.num_labels == 1:
             preds = logits.squeeze()
-
         return {"loss": val_loss, "preds": preds, "labels": labels, 'instance_ids': instance_ids, 'logits': logits}
 
     def test_step(self, batch, batch_idx):
         outputs = self(**batch)
         test_loss, logits, labels, instance_ids = outputs
+        self.log("test_loss", test_loss)
         if self.hparams.num_labels >= 1:
             preds = torch.argmax(logits, axis=1)
         elif self.hparams.num_labels == 1:
@@ -250,10 +238,12 @@ class MyTransformer(LightningModule):
 
     def validation_epoch_end(self, outputs):
         self.log("global_step", self.global_step)
+
         preds = torch.cat([x["preds"] for x in outputs]).detach()
         labels = torch.cat([x["labels"] for x in outputs]).detach()
         loss = torch.stack([x["loss"] for x in outputs]).mean()
         logits = torch.cat([x["logits"] for x in outputs]).detach()
+
         val_acc = self.metric_acc(preds, labels).cpu()
         val_f1 = self.metric_f1(preds, labels).cpu()
         self.log("val_acc", val_acc)
@@ -284,11 +274,12 @@ class MyTransformer(LightningModule):
         labels = torch.cat([x["labels"] for x in outputs]).detach()
         loss = torch.stack([x["loss"] for x in outputs]).mean()
         logits = torch.cat([x["logits"] for x in outputs]).detach()
-        self.log("test_loss", loss)
+
         test_acc = self.metric_acc(preds, labels)
         test_f1 = self.metric_f1(preds, labels)
         self.log("test_acc", test_acc.cpu(), prog_bar=True)
         self.log("test_f1", test_f1.cpu(), prog_bar=True)
+        self.log("avg_test_loss", loss, prog_bar=True)
 
         print(f'Logging test scores for epoch {self.current_epoch}')
         with open(os.path.join(self.val_pred_output_path, f'test-metrics{self.current_epoch}.json'), 'w') as f_out:
@@ -310,10 +301,10 @@ class MyTransformer(LightningModule):
     def setup(self, stage=None) -> None:
         if stage != "fit":
             return
-        # Get dataloader by calling it - train_dataloader() is called after setup() by default
-        train_loader = self.train_dataloader()
 
         # TODO - probably wrong
+        # Get dataloader by calling it - train_dataloader() is called after setup() by default
+        # train_loader = self.train_dataloader()
         # tb_size = self.hparams.batch_size * max(1, self.trainer.gpus)
         # ab_size = self.trainer.accumulate_grad_batches * float(self.trainer.max_epochs)
         # self.total_steps = (len(train_loader.dataset) // tb_size) // ab_size
@@ -321,11 +312,7 @@ class MyTransformer(LightningModule):
         if getattr(self.hparams, "max_steps", None):
             self.total_steps = self.hparams.max_steps
         else:
-            num_devices = get_world_size() if self.hparams.gpus > 1 or self.hparams.tpus != -1 else 1
-            # used in scheduler
-            self.total_steps = (
-                self.hparams.num_epochs * len(train_loader) / self.hparams.accumulate_grad_batches / num_devices
-            )
+            raise NotImplementedError(f'Please set max_steps...')
 
     def configure_optimizers(self):
         """Prepare optimizer and schedule (linear warmup and decay)"""
@@ -389,7 +376,7 @@ if __name__ == '__main__':
     # callbacks
     checkpoint_callback = ModelCheckpoint(dirpath=args.output,
                                           filename='{epoch:02d}-{step:02d}-{val_loss:.4f}-{val_f1:.4f}',
-                                          save_top_k=-1)
+                                          save_top_k=-1)        # save ckpt per epoch
     lr_monitor = LearningRateMonitor(logging_interval='step')
 
     # setup & train
@@ -401,9 +388,7 @@ if __name__ == '__main__':
     trainer = Trainer(gpus=args.gpus,
                       progress_bar_refresh_rate=5,
                       max_epochs=args.max_epochs,
-                      callbacks=[checkpoint_callback, lr_monitor],
-                      val_check_interval=24,
-                      limit_val_batches=24)
+                      callbacks=[checkpoint_callback, lr_monitor])
     trainer.fit(model, dm)
 
 
