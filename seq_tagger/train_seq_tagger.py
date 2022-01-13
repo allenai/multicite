@@ -181,6 +181,11 @@ class MyTransformer(LightningModule):
         test_pred_output_path: str,
         model_name_or_path: str = "allenai/scibert_scivocab_uncased",
         num_labels: int = 2,
+        learning_rate: float = 3e-5,
+        adam_epsilon: float = 1e-8,
+        warmup_steps: int = 0,
+        weight_decay: float = 0.0,
+        batch_size: int = 32,
         **kwargs,
     ):
         super().__init__()
