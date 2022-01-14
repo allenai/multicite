@@ -27,13 +27,10 @@ To run:
     for window in 1 3 5 7 9 11
     do
         model="allenai-scibert_scivocab_uncased__${window}__1__07-01-02"
-        for fold in 0 1 2 3 4
-        do
-            python seq_tagger/augment_seq_tag_data.py \
-            --original data/${model}/${fold}/ \
-            --full ${gold_data} \
-            --augmented data/${model}/${fold}-aug/
-        done
+        python seq_tagger/augment_seq_tag_data.py \
+        --original data/${model}/ \
+        --full ${gold_data} \
+        --augmented data/${model}/
     done
 
 """
@@ -45,7 +42,7 @@ import json
 import argparse
 
 import random
-
+from collections import defaultdict
 
 try:
     from seq_tagger.utils import instance_id_to_paper_id_and_intent, sent_id_to_pos
@@ -57,55 +54,62 @@ except ImportError:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('--original', type=str, help='Path to DIR containing processed train|dev|test.jsonl.', default='data/allenai-scibert_scivocab_uncased__11__1__07-01-02/0/')
+    parser.add_argument('--original', type=str, help='Path to DIR containing processed full.json & all train|dev|test.jsonl for CV splits.', default='data/allenai-scibert_scivocab_uncased__11__1__07-01-02/')
     parser.add_argument('--full', type=str, help='Path to full original dataset (processing agnostic).', default='data/full-v20210918.json')
-    parser.add_argument('--augmented', type=str, help='Path to DIR to output augmented train|dev|test.jsonl.', default='data/allenai-scibert_scivocab_uncased__11__1__07-01-02/0-aug/')
-    parser.add_argument('--keep_original', action='store_true')
+    parser.add_argument('--augmented', type=str, help='Path to DIR to output augmented full.json & all train|dev|test.jsonl for CV splits.', default='data/allenai-scibert_scivocab_uncased__11__1__07-01-02/')
     parser.add_argument('--seed', type=int, default=1)
     args = parser.parse_args()
 
     random.seed(args.seed)
     os.makedirs(args.augmented, exist_ok=True)
 
-    # load full gold data
+    # load original full gold data
     with open(args.full) as f_in:
-        full_dict = json.load(f_in)
+        original_full_dict = json.load(f_in)
 
-    # load train|dev|test JSONLs
-    for fname in ['train', 'dev', 'test']:
-        examples = []
-        with open(os.path.join(args.original, f'{fname}.jsonl')) as f_in:
-            for line in f_in:
-                examples.append(json.loads(line))
-        print(f'{len(examples)} original examples in {fname}')
+    # load processed full gold data
+    with open(os.path.join(args.original, 'full.json')) as f_in:
+        processed_full_dict = json.load(f_in)
 
-        # augment
-        augmented_examples = []
-        for example in tqdm(examples):
+    # augment
+    instance_id_to_augmented_examples = defaultdict(list)
+    i = 0
+    for example in tqdm(processed_full_dict['data']):
 
-            # for every example, make an identical window copy of it for all other @INTENT@ where all sents are not-context.
-            # this means models need to pay attention to the query @INTENT@.
+        # for every example, make an identical window copy of it for all other @INTENT@ where all sents are not-context.
+        # this means models need to pay attention to the query @INTENT@.
 
-            paper_id, intent = instance_id_to_paper_id_and_intent(instance_id=example['instance_id'])
-            for intent in INTENT_TOKENS:
-                if intent not in full_dict[paper_id]['y']:      # avoid accidentally constructing a false negative example
-                    augmented_examples.append({
-                        'id': WRONG_INTENT_INSTANCE_START_ID + example['id'],
-                        'instance_id': f"{example['instance_id']}__wrong_intent",
-                        'intent': intent,
-                        'sentences': example['sentences'],
-                        'labels': ['not-context' for label in example['labels']],
-                        'sent_ids': example['sent_ids']
-                    })
-        print(f'Constructed {len(augmented_examples)} augmented examples')
+        paper_id, intent = instance_id_to_paper_id_and_intent(instance_id=example['instance_id'])
+        for intent in INTENT_TOKENS:
+            if intent not in original_full_dict[paper_id]['y']:  # avoid accidentally constructing a false negative example
+                instance_id_to_augmented_examples[example['instance_id']].append({
+                    'id': WRONG_INTENT_INSTANCE_START_ID + i,
+                    'instance_id': f"{example['instance_id']}__wrong_intent__{intent}",
+                    'intent': intent,
+                    'sentences': example['sentences'],
+                    'labels': ['not-context' for label in example['labels']],
+                    'sent_ids': example['sent_ids']
+                })
+                i += 1
 
-        # maybe keep original
-        if args.keep_original:
-            print(f'Keeping original examples in augmentated set')
-            augmented_examples.extend(examples)
+    with open(os.path.join(args.augmented, 'full-aug.json'), 'w') as f_out:
+        json.dump(instance_id_to_augmented_examples, f_out, indent=4)
 
-        # write
-        with open(os.path.join(args.augmented, f'{fname}.jsonl'), 'w') as f_out:
-            for example in augmented_examples:
-                json.dump(example, f_out)
-                f_out.write('\n')
+
+    # split them into corresponding train|dev|test JSONLs
+    for fold in [0, 1, 2, 3, 4]:
+        for split in ['train', 'dev', 'test']:
+            to_write = []
+            with open(os.path.join(args.original, f'{fold}', f'{split}.jsonl')) as f_in:
+                for line in f_in:
+                    example = json.loads(line)
+                    augmented_examples = instance_id_to_augmented_examples[example['instance_id']]
+                    for aug in augmented_examples:
+                        to_write.append(aug)
+
+            # write
+            print(f'Writing {len(to_write)} augmented examples in fold {fold}-aug,  split {split}')
+            with open(os.path.join(args.augmented, f'{fold}-aug', f'{split}.jsonl'), 'w') as f_out:
+                for aug in to_write:
+                    json.dump(aug, f_out)
+                    f_out.write('\n')
