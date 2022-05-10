@@ -1,4 +1,4 @@
-# MultiCite
+# MultiCite (NAACL 2022)
 
 Modeling realistic citations requires moving beyond the single-sentence single-label setting.
 
@@ -6,7 +6,9 @@ See our preprint on [arXiv](https://arxiv.org/abs/2107.00414).
 
 ## Dataset
 
-The full dataset can be found at `data/full-v20210918.json`.  It has the following schema:
+### Full Dataset
+
+The full dataset can be found at `data/full-v20210918.json`. It has the following schema:
 
 ```
 {
@@ -39,7 +41,7 @@ The full dataset can be found at `data/full-v20210918.json`.  It has the followi
 }
 ```
 
-## Intent IDs
+Intent IDs
 
 ```
 {
@@ -54,23 +56,127 @@ The full dataset can be found at `data/full-v20210918.json`.  It has the followi
 }
 ```
 
+### Version for Classification Experiments
+
+For the classification experiments described in the manuscript, we extracted the citations contexts from the full texts.
+The versions we have used are provided in ```./data/classification_<context_size>_context```, where ```<context_size>```
+reflects the size of the context extracted around the citation mention. For instance, in
+```./data/classification_1_context```, the text to classify is always the sentence mentioning the cited work only,
+while in ```./data/classification_gold_context``` the text to classify corresponds to the annotated gold context.
+
+The structure is the following:
+
+```
+ [
+     {
+      "id": <instance_id>,
+      "x": <text>,
+      "y": <label>
+     }
+ ]
+```
+
+### Version for Q&A Experiments
+
+Also for the Q&A experiments described in the manuscript, we needed to transform the data.
+The versions we have used are provided in ```./data/classification_<context_size>_context```, where ```<context_size>```
+reflects the size of the context extracted around the citation mention. For instance, in
+```./data/classification_1_context```, the text to classify is always the sentence mentioning the cited work only,
+while in ```./data/classification_gold_context``` the text to classify corresponds to the annotated gold context.
+
+The code we used to convert the data is available in ```./qa/convert_ours_to_qa.py```.
+
+The structure is the following:
+
+```
+[
+    {
+        <paper_id>: {
+            "title": <paper_id>,
+                "abstract": "",
+                "full_text": [
+                    {
+                        "section_name": "",
+                        "paragraphs": [
+                           <full_text_as_list_of_sentences>
+                        ]
+                    }
+               ],
+               "qas": [
+                        {
+                           "question": "Does the paper cite <cited_work> for background information?",
+                           "question_id": "ABC_8f0aab7fd30ffc56cc477b25e6bb16_00",
+                           "answers": [
+                              {
+                                 "answer": {
+                                    "unanswerable": false,
+                                    "extracted_spans": [],
+                                    "yes_no": <label-true/false>,
+                                    "free_form_answer": "",
+                                    "evidence": [
+                                    <citation_context_if_label_true>
+                                    ],
+                                    "highlighted_evidence": []
+                                 }
+                              }
+                           ]
+                        }, 
+                        {
+                           "question": "Does the paper cite <cited_work> as motivation?",
+                           "question_id": "ABC_8f0aab7fd30ffc56cc477b25e6bb16_02",
+                           "answers": [
+                              {
+                                 "answer": {
+                                    "unanswerable": false,
+                                    "extracted_spans": [],
+                                    "yes_no": <label-true/false>,
+                                    "free_form_answer": "",
+                                    "evidence": [
+                                       <citation_context_if_label_true>
+                                    ],
+                                    "highlighted_evidence": []
+                                 }
+                              }
+                           ]
+                        }, ...
+               ]
+    }, ...
+]
+```
+
 ## Models
 
-All models trained are available on Huggingface:
+The model checkpoints trained are available on Huggingface:
 
 1. Multi-label Citation Intent Classification
-https://huggingface.co/allenai/multicite-multilabel-scibert
-https://huggingface.co/allenai/multicite-multilabel-roberta-large
+
+   https://huggingface.co/allenai/multicite-multilabel-scibert
+   https://huggingface.co/allenai/multicite-multilabel-roberta-large
+
 
 2. Citation Context Identification
-tba
+
+   tba
+
 
 3. Paper-Level Citation Intent Q&A
-tba
+
+   https://huggingface.co/allenai/multicite-qa-qasper
+
+## Experiments
+
+### Classification
+The scripts needed for running the multi-label classification experiments can be found in ```./classification```.
+An example call is provided in ```./classification/run_classify_multilabel.sh```.
+
+### Paper-level Citation Intent Q&A
+For running these experiments, we used the original code from Dasigi et al., 2021. A script converting our data set to the Qasper 
+Q&A format is ```./qa/convert_ours_to_qa.py```. Baseline code is available in ```./qa/eval_qa.py```.
 
 ## License
 
-MultiCite is released under the CC BY-NC 2.0 as it is derived on top of [S2ORC](https://github.com/allenai/s2orc#license).  By using MultiCite, you are agreeing to its usage terms.
+MultiCite is released under the CC BY-NC 2.0 as it is derived on top
+of [S2ORC](https://github.com/allenai/s2orc#license). By using MultiCite, you are agreeing to its usage terms.
 
 ## Citation
 
