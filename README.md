@@ -56,7 +56,17 @@ The full dataset can be found at `data/full-v20210918.json`.  It has the followi
 
 ## Models
 
-TBD
+All models trained are available on Huggingface:
+
+1. Multi-label Citation Intent Classification
+https://huggingface.co/allenai/multicite-multilabel-scibert
+https://huggingface.co/allenai/multicite-multilabel-roberta-large
+
+2. Citation Context Identification
+tba
+
+3. Paper-Level Citation Intent Q&A
+tba
 
 ## License
 
